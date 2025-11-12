@@ -48,3 +48,7 @@ All data is stored in JSON files in the `src/data/` directory. The structure can
 - Fully interactive feel without backend
 - Responsive layout
 
+
+## Public URL
+
+https://yoav-cloud.github.io/create-mock-ui-app/
