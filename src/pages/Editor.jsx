@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Stage, Layer, Text, Rect, Circle, Group } from 'react-konva'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import toast from 'react-hot-toast'
 import './Editor.css'
 import Button from '../components/Button'
 import BackButton from '../components/BackButton'
@@ -28,11 +29,12 @@ function Editor() {
   const [layers, setLayers] = useState([])
   const [selectedLayer, setSelectedLayer] = useState(null)
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 })
-  const [saved, setSaved] = useState(false)
   const [projectId, setProjectId] = useState(projectIdFromState || null)
   const [isSubDesign, setIsSubDesign] = useState(false)
   const [parentDesign, setParentDesign] = useState(null)
   const [subDesigns, setSubDesigns] = useState([])
+  const autoSaveTimeoutRef = useRef(null)
+  const lastSavedRef = useRef(null)
 
   useEffect(() => {
     if (urlDesignId) {
@@ -85,15 +87,11 @@ function Editor() {
     getEffectiveLayers,
   ])
 
-  const handleSave = () => {
-    let currentDesignId = designId
-    
-    if (!currentDesignId) {
-      currentDesignId = createNewDesign(projectId, designName)
-      setDesignId(currentDesignId)
-    }
+  // Auto-save function with debouncing
+  const performSave = useCallback((showToast = false) => {
+    if (!designId) return
 
-    const existingDesign = getDesign(currentDesignId)
+    const existingDesign = getDesign(designId)
     const saveData = {
       name: designName,
       projectId,
@@ -118,13 +116,53 @@ function Editor() {
       saveData.layers = layers
     }
 
-    saveDesign(currentDesignId, saveData)
+    // Check if there are actual changes
+    const currentState = JSON.stringify(saveData)
+    if (lastSavedRef.current === currentState) {
+      return // No changes, skip save
+    }
 
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+    saveDesign(designId, saveData)
+    lastSavedRef.current = currentState
 
-    // Don't navigate away - let user continue editing
-    // navigate(`/designs/${currentDesignId}`)
+    if (showToast) {
+      toast.success('Saved!', { duration: 2000 })
+    }
+  }, [designId, designName, projectId, canvasSize, layers, isSubDesign, parentDesign, getDesign, saveDesign])
+
+  // Auto-save with debouncing
+  const triggerAutoSave = useCallback(() => {
+    // Only auto-save if design already exists
+    if (!designId) return
+    
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current)
+    }
+
+    autoSaveTimeoutRef.current = setTimeout(() => {
+      performSave(true) // Show toast on auto-save
+    }, 1000) // 1 second debounce
+  }, [performSave, designId])
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  const handleSave = () => {
+    let currentDesignId = designId
+    
+    if (!currentDesignId) {
+      currentDesignId = createNewDesign(projectId, designName)
+      setDesignId(currentDesignId)
+      toast.success('Design created!', { duration: 2000 })
+    }
+
+    performSave(true) // Manual save always shows toast
   }
 
   const addTextLayer = () => {
@@ -139,6 +177,7 @@ function Editor() {
     }
     setLayers([...layers, newLayer])
     setSelectedLayer(newLayer.id)
+    triggerAutoSave()
     // For sub-designs, new layers are automatically local (not inherited)
   }
 
@@ -156,6 +195,7 @@ function Editor() {
     }
     setLayers([...layers, newLayer])
     setSelectedLayer(newLayer.id)
+    triggerAutoSave()
   }
 
   const addCircleLayer = () => {
@@ -171,6 +211,7 @@ function Editor() {
     }
     setLayers([...layers, newLayer])
     setSelectedLayer(newLayer.id)
+    triggerAutoSave()
   }
 
   const updateLayer = (id, updates) => {
@@ -186,6 +227,7 @@ function Editor() {
         setTimeout(() => {
           const effectiveLayers = getEffectiveLayers(designId)
           setLayers(effectiveLayers)
+          triggerAutoSave()
         }, 0)
       } else {
         // Local layer, update normally
@@ -194,6 +236,7 @@ function Editor() {
             layer.id === id ? { ...layer, ...updates } : layer
           )
         )
+        triggerAutoSave()
       }
     } else {
       // Regular design, update normally
@@ -202,6 +245,7 @@ function Editor() {
           layer.id === id ? { ...layer, ...updates } : layer
         )
       )
+      triggerAutoSave()
     }
   }
 
@@ -230,6 +274,7 @@ function Editor() {
           // Refresh effective layers
           const effectiveLayers = getEffectiveLayers(designId)
           setLayers(effectiveLayers)
+          triggerAutoSave()
         } else {
           // No override, can't delete inherited layer
           // Could show a message here
@@ -244,11 +289,13 @@ function Editor() {
           layers: updatedLayers,
         })
         setLayers(layers.filter((layer) => layer.id !== id))
+        triggerAutoSave()
       }
     } else {
       // Parent design - remove from parent and all sub-designs without overrides
       removeLayerFromParent(designId, id)
       setLayers(layers.filter((layer) => layer.id !== id))
+      triggerAutoSave()
     }
     
     if (selectedLayer === id) {
@@ -262,6 +309,7 @@ function Editor() {
       // Refresh layers to show inherited version
       const effectiveLayers = getEffectiveLayers(designId)
       setLayers(effectiveLayers)
+      triggerAutoSave()
     }
   }
 
@@ -320,6 +368,7 @@ function Editor() {
     textarea.onkeydown = (e) => {
       if (e.keyCode === 13 && !e.shiftKey) {
         textNode.text(textarea.value)
+        updateLayer(textNode.id(), { text: textarea.value })
         removeTextarea()
       }
       if (e.keyCode === 27) {
@@ -329,6 +378,7 @@ function Editor() {
 
     textarea.onblur = () => {
       textNode.text(textarea.value)
+      updateLayer(textNode.id(), { text: textarea.value })
       removeTextarea()
     }
   }
@@ -419,11 +469,13 @@ function Editor() {
             <input
               type="text"
               value={designName}
-              onChange={(e) => setDesignName(e.target.value)}
+              onChange={(e) => {
+                setDesignName(e.target.value)
+                triggerAutoSave()
+              }}
               className="editor-title-input"
               placeholder="Design Name"
             />
-            {saved && <span className="editor-saved-indicator">Saved!</span>}
           </div>
         </div>
         <div className="editor-header-actions">
@@ -436,7 +488,7 @@ function Editor() {
             </Button>
           )}
           <Button variant="primary" onClick={handleSave}>
-            {saved ? 'Saved!' : 'Save'}
+            Save
           </Button>
         </div>
       </div>
@@ -497,18 +549,20 @@ function Editor() {
               <input
                 type="number"
                 value={canvasSize.width}
-                onChange={(e) =>
+                onChange={(e) => {
                   setCanvasSize({ ...canvasSize, width: parseInt(e.target.value) || 800 })
-                }
+                  triggerAutoSave()
+                }}
                 className="editor-input"
               />
               <span>×</span>
               <input
                 type="number"
                 value={canvasSize.height}
-                onChange={(e) =>
+                onChange={(e) => {
                   setCanvasSize({ ...canvasSize, height: parseInt(e.target.value) || 600 })
-                }
+                  triggerAutoSave()
+                }}
                 className="editor-input"
               />
             </div>

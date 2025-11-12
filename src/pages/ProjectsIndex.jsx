@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import toast from 'react-hot-toast'
 import './ProjectsIndex.css'
 import Button from '../components/Button'
 import Modal from '../components/Modal'
@@ -47,6 +48,7 @@ function ProjectsIndex() {
       description: projectDescription.trim(),
     })
 
+    toast.success(`Project "${newProject.name}" created!`, { duration: 2000 })
     handleCloseModal()
     navigate(`/projects/${newProject.id}`)
   }

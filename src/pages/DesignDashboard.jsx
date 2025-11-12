@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Stage, Layer, Text, Rect, Circle } from 'react-konva'
 import { useParams, useNavigate, useLocation, Routes, Route } from 'react-router-dom'
+import toast from 'react-hot-toast'
 import './DesignDashboard.css'
 import designsData from '../data/designs.json'
 import projectsData from '../data/projects.json'
 import channelsData from '../data/channels.json'
+import brandKitsData from '../data/brandKits.json'
 import Button from '../components/Button'
 import BackButton from '../components/BackButton'
 import Modal from '../components/Modal'
@@ -117,6 +119,19 @@ function DesignDashboard() {
   const [selectedChannel, setSelectedChannel] = useState(null)
   const [userEnteredName, setUserEnteredName] = useState(false)
   const [subDesigns, setSubDesigns] = useState([])
+  const [showParentInPreview, setShowParentInPreview] = useState(() => {
+    // Load from sessionStorage or default to true
+    const stored = sessionStorage.getItem(`include_parent_generation_${designId}`)
+    return stored !== null ? stored === 'true' : true
+  })
+  const nameInputRef = useRef(null)
+  
+  // Save toggle state to sessionStorage when it changes
+  useEffect(() => {
+    if (designId) {
+      sessionStorage.setItem(`include_parent_generation_${designId}`, showParentInPreview.toString())
+    }
+  }, [showParentInPreview, designId])
 
   useEffect(() => {
     // Check if we should open sub-design modal from navigation state
@@ -264,6 +279,7 @@ function DesignDashboard() {
     )
 
     if (newSubDesignId) {
+      toast.success(`Sub-design "${subDesignName.trim()}" created!`, { duration: 2000 })
       handleCloseSubDesignModal()
       // Refresh sub-designs list
       const subs = getSubDesigns(designId)
@@ -280,6 +296,12 @@ function DesignDashboard() {
   const handleNameEdit = () => {
     setIsEditingName(true)
     setEditedName(design.name)
+    // Auto-select text after a brief delay to ensure input is focused
+    setTimeout(() => {
+      if (nameInputRef.current) {
+        nameInputRef.current.select()
+      }
+    }, 0)
   }
 
   const handleNameSave = () => {
@@ -290,6 +312,7 @@ function DesignDashboard() {
       }
       saveDesign(designId, updatedDesign)
       setDesign(updatedDesign)
+      toast.success('Design name updated!', { duration: 2000 })
     }
     setIsEditingName(false)
   }
@@ -301,6 +324,7 @@ function DesignDashboard() {
 
   const handleNameKeyDown = (e) => {
     if (e.key === 'Enter') {
+      e.preventDefault()
       handleNameSave()
     } else if (e.key === 'Escape') {
       handleNameCancel()
@@ -325,6 +349,7 @@ function DesignDashboard() {
           <BackButton to={project ? `/projects/${project.id}` : '/'} />
           {isEditingName ? (
             <input
+              ref={nameInputRef}
               type="text"
               className="design-dashboard-title-input"
               value={editedName}
@@ -401,8 +426,13 @@ function DesignDashboard() {
         <button
           className={`design-dashboard-nav-item ${
             location.pathname.includes('/results') ? 'active' : ''
-          }`}
-          onClick={() => navigate(`/designs/${designId}/generation/results`)}
+          } ${!sessionStorage.getItem(`generation_started_${designId}`) ? 'disabled' : ''}`}
+          onClick={() => {
+            if (sessionStorage.getItem(`generation_started_${designId}`)) {
+              navigate(`/designs/${designId}/generation/results`)
+            }
+          }}
+          disabled={!sessionStorage.getItem(`generation_started_${designId}`)}
         >
           Generation Results
         </button>
@@ -530,7 +560,7 @@ function DesignDashboard() {
                       <div className="design-dashboard-subnav">
                         {(() => {
                           if (!design.parentId && subDesigns.length > 0) {
-                            // Viewing parent - show parent first, then sub-designs
+                            // Viewing parent - show parent first (if toggle is on), then sub-designs
                             return (
                               <>
                                 <button
@@ -726,6 +756,58 @@ function DesignDashboard() {
                         {design.updatedAt || 'N/A'}
                       </span>
                     </div>
+                  </div>
+                </div>
+
+                <div className="design-dashboard-section">
+                  <h3 className="design-dashboard-section-title">Settings</h3>
+                  
+                  {!design.parentId && subDesigns.length > 0 && (
+                    <div className="design-dashboard-toggle">
+                      <label className="design-dashboard-toggle-label">
+                        <input
+                          type="checkbox"
+                          checked={showParentInPreview}
+                          onChange={(e) => setShowParentInPreview(e.target.checked)}
+                          className="design-dashboard-toggle-input"
+                        />
+                        <span className="design-dashboard-toggle-text">
+                          Include parent in generation
+                        </span>
+                      </label>
+                      <p className="design-dashboard-toggle-hint">
+                        {showParentInPreview
+                          ? 'Parent design will be included when generating assets'
+                          : 'Only sub-designs will be used for generation'}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="design-dashboard-brandkit">
+                    <label className="design-dashboard-brandkit-label">
+                      Brand Kit
+                    </label>
+                    <select
+                      className="design-dashboard-brandkit-select"
+                      value={design.brandKitId || ''}
+                      onChange={(e) => {
+                        const brandKitId = e.target.value || null
+                        const updatedDesign = {
+                          ...design,
+                          brandKitId,
+                        }
+                        saveDesign(designId, updatedDesign)
+                        setDesign(updatedDesign)
+                        toast.success('Brand kit assigned!', { duration: 2000 })
+                      }}
+                    >
+                      <option value="">None</option>
+                      {brandKitsData.map((kit) => (
+                        <option key={kit.id} value={kit.id}>
+                          {kit.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 

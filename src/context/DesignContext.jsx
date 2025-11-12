@@ -6,6 +6,8 @@ export function DesignProvider({ children }) {
   // Store designs both by ID (for quick lookup) and by project (for project views)
   const [designsById, setDesignsById] = useState({})
   const [designsByProject, setDesignsByProject] = useState({})
+  // Store generation data per design (CSV data, expected fields, generated assets)
+  const [generationData, setGenerationData] = useState({})
 
   const saveDesign = (designId, designData) => {
     const design = {
@@ -236,6 +238,22 @@ export function DesignProvider({ children }) {
     })
   }
 
+  // Save generation CSV data for a design
+  const saveGenerationData = (designId, data) => {
+    setGenerationData((prev) => ({
+      ...prev,
+      [designId]: {
+        ...prev[designId],
+        ...data,
+      },
+    }))
+  }
+
+  // Get generation data for a design
+  const getGenerationData = (designId) => {
+    return generationData[designId] || null
+  }
+
   return (
     <DesignContext.Provider
       value={{
@@ -251,6 +269,8 @@ export function DesignProvider({ children }) {
         setLayerOverride,
         resetLayerOverride,
         removeLayerFromParent,
+        saveGenerationData,
+        getGenerationData,
       }}
     >
       {children}

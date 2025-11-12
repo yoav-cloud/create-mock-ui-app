@@ -7,8 +7,11 @@ import projectsData from '../../data/projects.json'
 import Button from '../../components/Button'
 
 function OneOffGeneration({ designId }) {
-  const { getDesign } = useDesign()
+  const { getDesign, getEffectiveLayers, getSubDesigns } = useDesign()
   const [design, setDesign] = useState(null)
+  const [parentDesign, setParentDesign] = useState(null)
+  const [subDesigns, setSubDesigns] = useState([])
+  const [selectedPreviewId, setSelectedPreviewId] = useState(designId)
   const [textValues, setTextValues] = useState({})
   const [isGenerating, setIsGenerating] = useState(false)
   const [generatedResult, setGeneratedResult] = useState(null)
@@ -19,15 +22,32 @@ function OneOffGeneration({ designId }) {
     
     if (savedDesign) {
       setDesign(savedDesign)
-      // Initialize text values from saved design
-      const initialValues = {}
-      if (savedDesign.layers) {
-        savedDesign.layers
-          .filter((layer) => layer.type === 'text')
-          .forEach((layer) => {
-            initialValues[layer.id] = layer.text || ''
-          })
+      
+      // Check if this is a sub-design and load parent/sub-designs
+      if (savedDesign.parentId) {
+        const parent = getDesign(savedDesign.parentId)
+        setParentDesign(parent)
+        if (parent) {
+          const subs = getSubDesigns(savedDesign.parentId)
+          setSubDesigns(subs)
+        }
+      } else {
+        // This is a parent design
+        setParentDesign(null)
+        const subs = getSubDesigns(designId)
+        setSubDesigns(subs)
       }
+      
+      // Use effective layers for text detection
+      const effectiveLayers = getEffectiveLayers(designId)
+      
+      // Initialize text values from effective layers
+      const initialValues = {}
+      effectiveLayers
+        .filter((layer) => layer.type === 'text')
+        .forEach((layer) => {
+          initialValues[layer.id] = layer.text || ''
+        })
       setTextValues(initialValues)
       return
     }
@@ -78,7 +98,21 @@ function OneOffGeneration({ designId }) {
         })
       setTextValues(initialValues)
     }
-  }, [designId, getDesign])
+  }, [designId, getDesign, getEffectiveLayers, getSubDesigns])
+
+  // Update text values when selected preview changes
+  useEffect(() => {
+    if (selectedPreviewId && getEffectiveLayers) {
+      const effectiveLayers = getEffectiveLayers(selectedPreviewId)
+      const initialValues = {}
+      effectiveLayers
+        .filter((layer) => layer.type === 'text')
+        .forEach((layer) => {
+          initialValues[layer.id] = layer.text || ''
+        })
+      setTextValues(initialValues)
+    }
+  }, [selectedPreviewId, getEffectiveLayers])
 
   const handleTextChange = (layerId, value) => {
     setTextValues((prev) => ({
@@ -109,14 +143,20 @@ function OneOffGeneration({ designId }) {
     )
   }
 
-  // Get text layers from design
-  const textLayers = design.layers
-    ? design.layers.filter((layer) => layer.type === 'text')
-    : []
-
-  // If no text layers in saved design, create some for the preview
-  const displayLayers = design.layers || []
+  // Get effective layers (handles sub-designs properly)
+  const effectiveLayers = design ? getEffectiveLayers(selectedPreviewId) : []
+  
+  // Get text layers from effective layers
+  const textLayers = effectiveLayers.filter((layer) => layer.type === 'text')
   const hasTextLayers = textLayers.length > 0
+  
+  // Get the design to display (parent or selected sub-design)
+  const displayDesign = selectedPreviewId === designId 
+    ? design 
+    : (selectedPreviewId === design?.parentId ? parentDesign : getDesign(selectedPreviewId))
+  
+  // Get display layers for the selected preview
+  const displayLayers = displayDesign ? getEffectiveLayers(selectedPreviewId) : []
 
   return (
     <div className="generation-page">
@@ -155,64 +195,135 @@ function OneOffGeneration({ designId }) {
               </div>
             </div>
           ) : (
-            <div className="one-off-preview-container">
-              <div className="one-off-preview-label">Design Preview</div>
-              <div className="one-off-canvas-wrapper">
-                <Stage
-                  width={design.canvasSize?.width || 800}
-                  height={design.canvasSize?.height || 600}
-                  className="one-off-preview-stage"
-                >
-                  <Layer>
-                    {displayLayers.map((layer) => {
-                      const commonProps = {
-                        key: layer.id,
-                        x: layer.x,
-                        y: layer.y,
-                        draggable: false,
-                      }
+            <div className="one-off-previews-container">
+              <div className="one-off-previews-scroll">
+                {(() => {
+                  // Helper function to render a preview
+                  const renderPreview = (previewDesign, previewId, label, isActive) => {
+                    const previewLayers = getEffectiveLayers(previewId)
+                    const canvasWidth = previewDesign.canvasSize?.width || 800
+                    const canvasHeight = previewDesign.canvasSize?.height || 600
+                    const maxWidth = 400
+                    const needsScaling = canvasWidth > maxWidth
+                    const scale = needsScaling ? maxWidth / canvasWidth : 1
+                    
+                    return (
+                      <div 
+                        key={previewId}
+                        className={`one-off-preview-item ${isActive ? 'active' : ''}`}
+                        onClick={() => setSelectedPreviewId(previewId)}
+                      >
+                        <div className="one-off-preview-label">{label}</div>
+                        <div className="one-off-canvas-wrapper">
+                          <div style={{
+                            width: needsScaling ? `${maxWidth}px` : `${canvasWidth}px`,
+                            maxWidth: '100%',
+                            margin: '0 auto'
+                          }}>
+                            <div style={{
+                              width: canvasWidth,
+                              height: canvasHeight,
+                              transform: needsScaling ? `scale(${scale})` : 'none',
+                              transformOrigin: 'top center'
+                            }}>
+                              <Stage
+                                width={canvasWidth}
+                                height={canvasHeight}
+                                className="one-off-preview-stage"
+                              >
+                                <Layer>
+                                  {previewLayers.map((layer) => {
+                                    const commonProps = {
+                                      key: layer.id,
+                                      x: layer.x,
+                                      y: layer.y,
+                                      draggable: false,
+                                    }
 
-                      switch (layer.type) {
-                        case 'text':
-                          return (
-                            <Text
-                              {...commonProps}
-                              text={
-                                textValues[layer.id] !== undefined
-                                  ? textValues[layer.id]
-                                  : layer.text
-                              }
-                              fontSize={layer.fontSize}
-                              fill={layer.fill}
-                            />
-                          )
-                        case 'rect':
-                          return (
-                            <Rect
-                              {...commonProps}
-                              width={layer.width}
-                              height={layer.height}
-                              fill={layer.fill}
-                              stroke={layer.stroke}
-                              strokeWidth={layer.strokeWidth}
-                            />
-                          )
-                        case 'circle':
-                          return (
-                            <Circle
-                              {...commonProps}
-                              radius={layer.radius}
-                              fill={layer.fill}
-                              stroke={layer.stroke}
-                              strokeWidth={layer.strokeWidth}
-                            />
-                          )
-                        default:
-                          return null
-                      }
-                    })}
-                  </Layer>
-                </Stage>
+                                    switch (layer.type) {
+                                      case 'text':
+                                        return (
+                                          <Text
+                                            {...commonProps}
+                                            text={
+                                              isActive && textValues[layer.id] !== undefined
+                                                ? textValues[layer.id]
+                                                : layer.text
+                                            }
+                                            fontSize={layer.fontSize}
+                                            fill={layer.fill}
+                                          />
+                                        )
+                                      case 'rect':
+                                        return (
+                                          <Rect
+                                            {...commonProps}
+                                            width={layer.width}
+                                            height={layer.height}
+                                            fill={layer.fill}
+                                            stroke={layer.stroke}
+                                            strokeWidth={layer.strokeWidth}
+                                          />
+                                        )
+                                      case 'circle':
+                                        return (
+                                          <Circle
+                                            {...commonProps}
+                                            radius={layer.radius}
+                                            fill={layer.fill}
+                                            stroke={layer.stroke}
+                                            strokeWidth={layer.strokeWidth}
+                                          />
+                                        )
+                                      default:
+                                        return null
+                                    }
+                                  })}
+                                </Layer>
+                              </Stage>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  }
+                  
+                  // Determine which designs to show
+                  const designsToShow = []
+                  
+                  // If viewing a sub-design, show parent first
+                  if (design?.parentId && parentDesign) {
+                    designsToShow.push({
+                      design: parentDesign,
+                      id: design.parentId,
+                      label: `Parent: ${parentDesign.name}`
+                    })
+                  }
+                  
+                  // Show current design (parent or sub-design)
+                  if (design) {
+                    designsToShow.push({
+                      design: design,
+                      id: designId,
+                      label: design.name
+                    })
+                  }
+                  
+                  // Show sub-designs (if viewing a parent)
+                  if (!design?.parentId && subDesigns.length > 0) {
+                    subDesigns.forEach(sub => {
+                      designsToShow.push({
+                        design: sub,
+                        id: sub.id,
+                        label: sub.name
+                      })
+                    })
+                  }
+                  
+                  return designsToShow.map(({ design: previewDesign, id: previewId, label }) =>
+                    renderPreview(previewDesign, previewId, label, selectedPreviewId === previewId)
+                  )
+                })()}
               </div>
             </div>
           )}
@@ -229,7 +340,7 @@ function OneOffGeneration({ designId }) {
                       <label>Text Layer {layer.id.split('-')[1] || '1'}</label>
                       <input
                         type="text"
-                        value={textValues[layer.id] || layer.text || ''}
+                        value={textValues[layer.id] !== undefined ? textValues[layer.id] : (layer.text || '')}
                         onChange={(e) =>
                           handleTextChange(layer.id, e.target.value)
                         }
