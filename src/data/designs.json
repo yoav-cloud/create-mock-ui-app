@@ -1,0 +1,83 @@
+{
+  "1": [
+    {
+      "id": "d1-1",
+      "name": "Summer Banner - Hero",
+      "description": "Main hero banner for homepage",
+      "status": "published",
+      "thumbnail": null,
+      "updatedAt": "1 day ago",
+      "createdAt": "2024-01-20T10:00:00Z"
+    },
+    {
+      "id": "d1-2",
+      "name": "Summer Banner - Product Grid",
+      "description": "Product showcase grid layout",
+      "status": "draft",
+      "thumbnail": null,
+      "updatedAt": "2 days ago",
+      "createdAt": "2024-01-19T14:30:00Z"
+    },
+    {
+      "id": "d1-3",
+      "name": "Summer Banner - CTA",
+      "description": "Call-to-action banner",
+      "status": "published",
+      "thumbnail": null,
+      "updatedAt": "3 days ago",
+      "createdAt": "2024-01-18T09:15:00Z"
+    }
+  ],
+  "2": [
+    {
+      "id": "d2-1",
+      "name": "Logo - Primary",
+      "description": "Main brand logo design",
+      "status": "in-review",
+      "thumbnail": null,
+      "updatedAt": "5 days ago",
+      "createdAt": "2024-01-12T11:00:00Z"
+    },
+    {
+      "id": "d2-2",
+      "name": "Logo - Secondary",
+      "description": "Alternative logo variant",
+      "status": "draft",
+      "thumbnail": null,
+      "updatedAt": "1 week ago",
+      "createdAt": "2024-01-11T15:20:00Z"
+    }
+  ],
+  "3": [
+    {
+      "id": "d3-1",
+      "name": "Product Image - Shirt Blue",
+      "description": "Product photography for blue shirt",
+      "status": "published",
+      "thumbnail": null,
+      "updatedAt": "2 days ago",
+      "createdAt": "2024-01-18T10:00:00Z"
+    },
+    {
+      "id": "d3-2",
+      "name": "Product Image - Shirt Red",
+      "description": "Product photography for red shirt",
+      "status": "published",
+      "thumbnail": null,
+      "updatedAt": "2 days ago",
+      "createdAt": "2024-01-18T10:00:00Z"
+    }
+  ],
+  "4": [
+    {
+      "id": "d4-1",
+      "name": "Instagram Post - Template 1",
+      "description": "Square format social media template",
+      "status": "draft",
+      "thumbnail": null,
+      "updatedAt": "1 week ago",
+      "createdAt": "2024-01-08T12:00:00Z"
+    }
+  ]
+}
+

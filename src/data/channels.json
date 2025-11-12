@@ -1,0 +1,38 @@
+[
+  {
+    "id": "ch1",
+    "name": "Instagram Square",
+    "transformation_string": "w_1080,h_1080,ar_1:1,c_fill",
+    "output_format": "jpg",
+    "max_file_size": "5MB"
+  },
+  {
+    "id": "ch2",
+    "name": "Facebook Cover",
+    "transformation_string": "w_1200,h_630,ar_1.91:1,c_fill",
+    "output_format": "jpg",
+    "max_file_size": "8MB"
+  },
+  {
+    "id": "ch3",
+    "name": "Twitter Header",
+    "transformation_string": "w_1500,h_500,ar_3:1,c_fill",
+    "output_format": "png",
+    "max_file_size": "5MB"
+  },
+  {
+    "id": "ch4",
+    "name": "LinkedIn Post",
+    "transformation_string": "w_1200,h_627,ar_1.91:1,c_fill",
+    "output_format": "jpg",
+    "max_file_size": null
+  },
+  {
+    "id": "ch5",
+    "name": "Email Banner",
+    "transformation_string": "w_600,h_200,ar_3:1,c_fill",
+    "output_format": "jpg",
+    "max_file_size": "2MB"
+  }
+]
+

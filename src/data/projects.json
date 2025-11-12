@@ -1,0 +1,39 @@
+[
+  {
+    "id": "1",
+    "name": "Summer Campaign 2024",
+    "description": "Marketing materials for the summer product launch",
+    "status": "active",
+    "designCount": 12,
+    "updatedAt": "2 days ago",
+    "createdAt": "2024-01-15T10:00:00Z"
+  },
+  {
+    "id": "2",
+    "name": "Brand Identity Refresh",
+    "description": "Complete rebranding project with new logo and color palette",
+    "status": "in-progress",
+    "designCount": 8,
+    "updatedAt": "1 week ago",
+    "createdAt": "2024-01-10T14:30:00Z"
+  },
+  {
+    "id": "3",
+    "name": "Product Catalog",
+    "description": "E-commerce product images and descriptions",
+    "status": "active",
+    "designCount": 45,
+    "updatedAt": "3 days ago",
+    "createdAt": "2024-01-05T09:15:00Z"
+  },
+  {
+    "id": "4",
+    "name": "Social Media Templates",
+    "description": "Reusable templates for Instagram and Facebook posts",
+    "status": "draft",
+    "designCount": 6,
+    "updatedAt": "2 weeks ago",
+    "createdAt": "2024-01-01T11:20:00Z"
+  }
+]
+
