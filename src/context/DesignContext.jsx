@@ -254,6 +254,26 @@ export function DesignProvider({ children }) {
     return generationData[designId] || null
   }
 
+  // Get effective brandKitId for a design (inherited from parent if sub-design)
+  const getEffectiveBrandKitId = (designId) => {
+    const design = getDesign(designId)
+    if (!design) return null
+
+    // If not a sub-design, return its own brandKitId
+    if (!design.parentId) {
+      return design.brandKitId || null
+    }
+
+    // If sub-design has its own brandKitId, use it
+    if (design.brandKitId) {
+      return design.brandKitId
+    }
+
+    // Otherwise, inherit from parent
+    const parentDesign = getDesign(design.parentId)
+    return parentDesign?.brandKitId || null
+  }
+
   return (
     <DesignContext.Provider
       value={{
@@ -271,6 +291,7 @@ export function DesignProvider({ children }) {
         removeLayerFromParent,
         saveGenerationData,
         getGenerationData,
+        getEffectiveBrandKitId,
       }}
     >
       {children}

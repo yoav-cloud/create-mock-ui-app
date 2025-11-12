@@ -35,3 +35,15 @@
   transform: scale(0.98);
 }
 
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.btn:disabled:hover {
+  background-color: inherit;
+  border-color: inherit;
+  transform: none;
+}
+

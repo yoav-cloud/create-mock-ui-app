@@ -480,10 +480,15 @@ function Editor() {
         </div>
         <div className="editor-header-actions">
           {!isSubDesign && (
-            <Button variant="secondary" onClick={() => {
-              // Open create sub-design modal - we'll need to navigate to dashboard or show modal
-              navigate(`/designs/${designId}`, { state: { openSubDesignModal: true } })
-            }}>
+            <Button 
+              variant="secondary" 
+              onClick={() => {
+                // Open create sub-design modal - we'll need to navigate to dashboard or show modal
+                navigate(`/designs/${designId}`, { state: { openSubDesignModal: true } })
+              }}
+              disabled={!designId}
+              title={!designId ? 'Save the design first to create sub-designs' : 'Create a sub-design'}
+            >
               Create Sub-Design
             </Button>
           )}

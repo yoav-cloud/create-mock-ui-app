@@ -107,7 +107,7 @@ function DesignDashboard() {
   const { designId } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
-  const { getDesign, saveDesign, getSubDesigns, createSubDesign, getEffectiveLayers, designs } = useDesign()
+  const { getDesign, saveDesign, getSubDesigns, createSubDesign, getEffectiveLayers, getEffectiveBrandKitId, designs } = useDesign()
   const { getProject } = useProject()
   const [design, setDesign] = useState(null)
   const [project, setProject] = useState(null)
@@ -786,19 +786,38 @@ function DesignDashboard() {
                   <div className="design-dashboard-brandkit">
                     <label className="design-dashboard-brandkit-label">
                       Brand Kit
+                      {design.parentId && !design.brandKitId && (
+                        <span className="design-dashboard-brandkit-inherited" title="Inherited from parent">
+                          (inherited)
+                        </span>
+                      )}
                     </label>
                     <select
                       className="design-dashboard-brandkit-select"
-                      value={design.brandKitId || ''}
+                      value={getEffectiveBrandKitId(designId) || ''}
                       onChange={(e) => {
-                        const brandKitId = e.target.value || null
+                        const selectedBrandKitId = e.target.value || null
+                        const parentBrandKitId = design.parentId && parentDesign ? parentDesign.brandKitId : null
+                        
+                        // For sub-designs: if selecting the same as parent's, save null to inherit
+                        // Otherwise, save the selected value to the sub-design
+                        let brandKitIdToSave = selectedBrandKitId
+                        if (design.parentId && selectedBrandKitId === parentBrandKitId) {
+                          brandKitIdToSave = null // Inherit from parent
+                        }
+                        
                         const updatedDesign = {
                           ...design,
-                          brandKitId,
+                          brandKitId: brandKitIdToSave,
                         }
                         saveDesign(designId, updatedDesign)
                         setDesign(updatedDesign)
-                        toast.success('Brand kit assigned!', { duration: 2000 })
+                        
+                        if (design.parentId && brandKitIdToSave === null && design.brandKitId) {
+                          toast.success('Brand kit reset to inherit from parent', { duration: 2000 })
+                        } else {
+                          toast.success('Brand kit assigned!', { duration: 2000 })
+                        }
                       }}
                     >
                       <option value="">None</option>
