@@ -1,0 +1,288 @@
+.preferences {
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: var(--spacing-xl) 0;
+}
+
+.preferences-header {
+  margin-bottom: var(--spacing-2xl);
+}
+
+.preferences-title {
+  font-size: 32px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: var(--spacing-md) 0 var(--spacing-sm);
+  letter-spacing: -0.02em;
+}
+
+.preferences-subtitle {
+  font-size: 16px;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.preferences-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xl);
+}
+
+.preferences-section {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-xl);
+}
+
+.preferences-section-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0 0 var(--spacing-md);
+}
+
+.preferences-section-description {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--spacing-lg);
+}
+
+.preferences-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.preferences-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.preferences-field-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.preferences-field-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.preferences-tooltip-container {
+  position: relative;
+  display: inline-block;
+}
+
+.preferences-tooltip-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-bg);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: help;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  padding: 0;
+  line-height: 1;
+}
+
+.preferences-tooltip-icon:hover {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+}
+
+.preferences-tooltip {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 1000;
+  background-color: var(--color-text);
+  color: #fff;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  line-height: 1.5;
+  max-width: 300px;
+  min-width: 200px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  pointer-events: none;
+  white-space: normal;
+  word-wrap: break-word;
+}
+
+.preferences-tooltip::before {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 12px;
+  border: 6px solid transparent;
+  border-bottom-color: var(--color-text);
+}
+
+
+.preferences-tooltip p {
+  margin: 0;
+}
+
+.preferences-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.preferences-input {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  transition: border-color 0.2s ease;
+  font-family: inherit;
+  width: 100%;
+  padding-right: 40px;
+}
+
+.preferences-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+}
+
+.preferences-input::placeholder {
+  color: var(--color-text-secondary);
+}
+
+.preferences-input-toggle {
+  position: absolute;
+  right: var(--spacing-sm);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: var(--spacing-xs);
+  font-size: 16px;
+  color: var(--color-text-secondary);
+  transition: color 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.preferences-input-toggle:hover {
+  color: var(--color-text);
+}
+
+.preferences-field-hint {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin-top: var(--spacing-xs);
+}
+
+.preferences-field-separator {
+  height: 1px;
+  background-color: var(--color-border);
+  margin: var(--spacing-md) 0;
+}
+
+.preferences-form-actions {
+  margin-top: var(--spacing-md);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.preferences-integrations {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--spacing-lg);
+}
+
+.preferences-integration-card {
+  background-color: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-lg);
+  transition: all 0.2s ease;
+  position: relative;
+  opacity: 0.7;
+}
+
+.preferences-integration-card:hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 2px 8px rgba(0, 102, 204, 0.1);
+}
+
+.preferences-integration-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-md);
+}
+
+.preferences-integration-icon {
+  font-size: 32px;
+  line-height: 1;
+}
+
+.preferences-integration-badge {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-secondary);
+  background-color: var(--color-surface);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-sm);
+}
+
+.preferences-integration-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0 0 var(--spacing-xs);
+}
+
+.preferences-integration-description {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin: 0;
+  line-height: 1.5;
+}
+
+@media (max-width: 768px) {
+  .preferences {
+    padding: var(--spacing-lg) 0;
+  }
+
+  .preferences-section {
+    padding: var(--spacing-lg);
+  }
+
+  .preferences-integrations {
+    grid-template-columns: 1fr;
+  }
+
+  .preferences-tooltip {
+    left: auto;
+    right: 0;
+    max-width: calc(100vw - 32px);
+    min-width: auto;
+    font-size: 12px;
+  }
+  
+  .preferences-tooltip::before {
+    left: auto;
+    right: 12px;
+  }
+}
+

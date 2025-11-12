@@ -23,6 +23,12 @@ function Layout({ children }) {
               >
                 Brand Center
               </button>
+              <button
+                className="layout-nav-link"
+                onClick={() => navigate('/preferences')}
+              >
+                Preferences
+              </button>
             </nav>
           </div>
         </div>

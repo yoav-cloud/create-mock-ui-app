@@ -3,6 +3,7 @@ import './BrandCenter.css'
 import brandKitsData from '../data/brandKits.json'
 import channelsData from '../data/channels.json'
 import Button from '../components/Button'
+import BackButton from '../components/BackButton'
 
 function BrandCenter() {
   const [brandKits, setBrandKits] = useState([])
@@ -40,6 +41,7 @@ function BrandCenter() {
   return (
     <div className="brand-center">
       <div className="brand-center-header">
+        <BackButton />
         <div>
           <h2 className="brand-center-title">Brand Center</h2>
           <p className="brand-center-subtitle">

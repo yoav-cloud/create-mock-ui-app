@@ -10,6 +10,7 @@ import PreDesignEditor from './pages/PreDesignEditor'
 import Templates from './pages/Templates'
 import Editor from './pages/Editor'
 import BrandCenter from './pages/BrandCenter'
+import Preferences from './pages/Preferences'
 
 function App() {
   return (
@@ -25,6 +26,7 @@ function App() {
             <Route path="/editor" element={<Editor />} />
             <Route path="/editor/:designId" element={<Editor />} />
             <Route path="/brand-center" element={<BrandCenter />} />
+            <Route path="/preferences" element={<Preferences />} />
           </Routes>
           <Toaster 
             position="top-right"
