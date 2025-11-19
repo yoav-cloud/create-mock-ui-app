@@ -105,6 +105,7 @@
 }
 
 .design-option {
+  position: relative;
   padding: 1rem;
   background-color: #333;
   border-radius: 8px;
@@ -126,6 +127,30 @@
   font-weight: 600;
   margin-bottom: 0.25rem;
   line-height: 1.3;
+}
+
+.design-icon-wrapper {
+  position: absolute;
+  bottom: 0.75rem;
+  right: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.design-icon {
+  opacity: 0.6;
+  color: #888;
+  transition: all 0.2s ease;
+}
+
+.design-option.active .design-icon {
+  color: var(--active-color);
+  opacity: 1;
+}
+
+.design-option:hover .design-icon {
+  opacity: 0.8;
 }
 
 .design-dims {
@@ -308,6 +333,123 @@
   margin-top: 3.5rem; /* Space for tabs at top */
 }
 
+/* URL Preview Card */
+.url-preview-card {
+  background-color: #252525;
+  border: 1px solid #444;
+  border-radius: 6px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace;
+}
+
+.url-preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.url-preview-label {
+  font-size: 0.75rem;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.url-open-button {
+  background-color: #333;
+  border: 1px solid #555;
+  border-radius: 4px;
+  padding: 0.4rem 0.6rem;
+  color: #aaa;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.url-open-button:hover {
+  background-color: var(--active-color);
+  border-color: var(--active-color);
+  color: #fff;
+}
+
+.url-preview-content {
+  font-size: 0.7rem;
+  line-height: 1.6;
+  word-break: break-all;
+  color: #ccc;
+}
+
+.url-segment {
+  transition: all 0.3s ease;
+  padding: 2px 4px;
+  border-radius: 3px;
+  display: inline;
+}
+
+.url-segment-base {
+  color: #4a9eff;
+}
+
+.url-segment-variable {
+  color: #ff6b9d;
+  background-color: rgba(255, 107, 157, 0.1);
+}
+
+.url-segment-canvas {
+  color: #51cf66;
+  background-color: rgba(81, 207, 102, 0.1);
+}
+
+.url-segment-layer-title {
+  color: #ffd43b;
+  background-color: rgba(255, 212, 59, 0.1);
+}
+
+.url-segment-layer-tagline {
+  color: #74c0fc;
+  background-color: rgba(116, 192, 252, 0.1);
+}
+
+.url-segment-layer-image {
+  color: #ff922b;
+  background-color: rgba(255, 146, 43, 0.1);
+}
+
+.url-segment-layer-origPrice {
+  color: #c2255c;
+  background-color: rgba(194, 37, 92, 0.1);
+}
+
+.url-segment-layer-price {
+  color: #20c997;
+  background-color: rgba(32, 201, 151, 0.1);
+}
+
+.url-segment-layer-apply {
+  color: #9775fa;
+  background-color: rgba(151, 117, 250, 0.1);
+}
+
+.url-segment-publicId {
+  color: #868e96;
+}
+
+.url-segment-separator {
+  color: #666;
+}
+
+.url-segment.highlighted {
+  background-color: var(--active-color) !important;
+  color: #fff !important;
+  box-shadow: 0 0 8px rgba(3, 169, 244, 0.5);
+  transform: scale(1.05);
+}
+
 .rules-table {
   width: 100%;
   border-collapse: collapse;
@@ -363,6 +505,76 @@
   font-size: 0.9rem;
   border-bottom: 1px solid #3a3a3a;
   font-weight: 600;
+}
+
+/* Row highlighting animation */
+.rules-table tbody tr[data-row-key] {
+  transition: all 0.4s ease;
+}
+
+.rules-table tbody tr[data-row-key].highlighted {
+  background-color: rgba(3, 169, 244, 0.2) !important;
+  box-shadow: 0 0 12px rgba(3, 169, 244, 0.4);
+  transform: scale(1.01);
+}
+
+.rules-table tbody tr[data-row-key].highlighted td {
+  color: #fff;
+  font-weight: 600;
+}
+
+/* Editable Rule Inputs */
+.rule-input {
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  background-color: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 0.85rem;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.rule-input:focus {
+  outline: none;
+  border-color: var(--active-color);
+  background-color: #333;
+  box-shadow: 0 0 0 2px rgba(3, 169, 244, 0.2);
+}
+
+.rule-input:hover:not(:disabled):not([readonly]) {
+  border-color: #555;
+  background-color: #2f2f2f;
+}
+
+.rule-input:disabled,
+.rule-input[readonly] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: #1f1f1f;
+}
+
+.rule-input-color {
+  height: 32px;
+  padding: 2px;
+  cursor: pointer;
+}
+
+.rule-input-color:disabled {
+  cursor: not-allowed;
+}
+
+.rule-input-number {
+  width: 100px;
+}
+
+.rule-input-select {
+  cursor: pointer;
+}
+
+.rule-input-text {
+  min-width: 150px;
 }
 
 .preview-wrapper {

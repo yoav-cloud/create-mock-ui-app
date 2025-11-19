@@ -73,29 +73,29 @@ const DESIGN_RULES = {
   'parent': {
     width: 500,
     height: 900,
-    title: { x: 30, y: 40, gravity: GRAVITY_VALUES.northWest, fontSize: 32 },
-    tagline: { x: 30, y: 120, gravity: GRAVITY_VALUES.northEast, fontSize: 20 },
+    title: { x: 30, y: 40, gravity: GRAVITY_VALUES.northWest, fontSize: 32, color: '#ffffff' },
+    tagline: { x: 30, y: 120, gravity: GRAVITY_VALUES.northEast, fontSize: 20, color: '#ffffff' },
     image: { width: 300, height: 300, x: 10, y: 30, gravity: GRAVITY_VALUES.southEast },
-    origPrice: { x: 30, y: 40, gravity: GRAVITY_VALUES.southWest, fontSize: 30 },
-    price: { x: 130, y: 40, gravity: GRAVITY_VALUES.southWest, fontSize: 44 }
+    origPrice: { x: 30, y: 40, gravity: GRAVITY_VALUES.southWest, fontSize: 30, color: '#bbbbbb' },
+    price: { x: 130, y: 40, gravity: GRAVITY_VALUES.southWest, fontSize: 44, color: '#ffffff' }
   },
   'ig-ad': {
     width: 1080,
     height: 1080,
-    title: { x: 0, y: 65, gravity: GRAVITY_VALUES.north, fontSize: 32 },
-    tagline: { x: 0, y: 100, gravity: GRAVITY_VALUES.north, fontSize: 20 },
+    title: { x: 0, y: 65, gravity: GRAVITY_VALUES.north, fontSize: 32, color: '#ffffff' },
+    tagline: { x: 0, y: 100, gravity: GRAVITY_VALUES.north, fontSize: 20, color: '#ffffff' },
     image: { width: 350, height: 250, x: 0, y: 120, gravity: GRAVITY_VALUES.north },
-    origPrice: { x: -50, y: 60, gravity: GRAVITY_VALUES.south, fontSize: 30 },
-    price: { x: 50, y: 50, gravity: GRAVITY_VALUES.south, fontSize: 44 }
+    origPrice: { x: -50, y: 60, gravity: GRAVITY_VALUES.south, fontSize: 30, color: '#bbbbbb' },
+    price: { x: 50, y: 50, gravity: GRAVITY_VALUES.south, fontSize: 44, color: '#ffffff' }
   },
   'fb-mobile': {
     width: 1080,
     height: 1350,
-    title: { x: 0, y: 30, gravity: GRAVITY_VALUES.north, fontSize: 32 },
-    tagline: { x: 0, y: 60, gravity: GRAVITY_VALUES.south, fontSize: 20 },
+    title: { x: 0, y: 30, gravity: GRAVITY_VALUES.north, fontSize: 32, color: '#ffffff' },
+    tagline: { x: 0, y: 60, gravity: GRAVITY_VALUES.south, fontSize: 20, color: '#ffffff' },
     image: { width: 380, height: 280, x: 0, y: 60, gravity: GRAVITY_VALUES.center },
-    origPrice: { x: 0, y: -160, gravity: GRAVITY_VALUES.center, fontSize: 30 },
-    price: { x: 0, y: -120, gravity: GRAVITY_VALUES.center, fontSize: 44 }
+    origPrice: { x: 0, y: -160, gravity: GRAVITY_VALUES.center, fontSize: 30, color: '#bbbbbb' },
+    price: { x: 0, y: -120, gravity: GRAVITY_VALUES.center, fontSize: 44, color: '#ffffff' }
   }
 }
 
@@ -136,6 +136,32 @@ function DesignPlayground() {
 
   // Preview tab state (visual or textual)
   const [previewTab, setPreviewTab] = useState('visual')
+  
+  // Highlighted row state for URL preview interaction
+  const [highlightedRow, setHighlightedRow] = useState(null)
+
+  // Editable rules state - initialized from DESIGN_RULES
+  const [editableRules, setEditableRules] = useState(() => {
+    const saved = localStorage.getItem('playground_editable_rules')
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved)
+        // Merge with DESIGN_RULES to ensure all properties exist
+        const merged = {}
+        Object.keys(DESIGN_RULES).forEach(designId => {
+          merged[designId] = {
+            ...DESIGN_RULES[designId],
+            ...(parsed[designId] || {})
+          }
+        })
+        return merged
+      } catch (e) {
+        // If parsing fails, use DESIGN_RULES
+        return JSON.parse(JSON.stringify(DESIGN_RULES))
+      }
+    }
+    return JSON.parse(JSON.stringify(DESIGN_RULES))
+  })
 
   const [useMetadata, setUseMetadata] = useState(() => {
     const saved = localStorage.getItem('playground_metadata_toggles')
@@ -183,15 +209,20 @@ function DesignPlayground() {
     localStorage.setItem('playground_canvas_dimensions', JSON.stringify(canvasDimensions))
   }, [canvasDimensions])
 
-  // Update canvas dimensions when design changes (if not already customized)
   useEffect(() => {
-    const rules = DESIGN_RULES[selectedDesign.id] || DESIGN_RULES['parent']
-    // Update to match the new design's default dimensions
+    localStorage.setItem('playground_editable_rules', JSON.stringify(editableRules))
+  }, [editableRules])
+
+  // Update canvas dimensions when design changes
+  useEffect(() => {
+    const rules = editableRules[selectedDesign.id] || editableRules['parent'] || DESIGN_RULES[selectedDesign.id] || DESIGN_RULES['parent']
+    // Update to match the new design's dimensions
     setCanvasDimensions({
       width: rules.width,
       height: rules.height
     })
-  }, [selectedDesign.id]) // Only depend on design ID
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDesign.id]) // Only depend on design ID to avoid resetting on rule changes
 
   // Helper to extract metadata ID from {id} syntax
   const extractMetadataId = (value) => {
@@ -535,12 +566,18 @@ function DesignPlayground() {
     const publicIdClean = selectedAsset.publicId.replace(/\//g, ':')
     const imgVar = `!${publicIdClean}!`
     
-    // Get positioning rules for the selected design type
-    const rules = DESIGN_RULES[selectedDesign.id] || DESIGN_RULES['parent']
+    // Get positioning rules for the selected design type (use editable rules)
+    const rules = editableRules[selectedDesign.id] || editableRules['parent']
     
     // Use canvas dimensions from state (editable) or fallback to rules
     const padW = canvasDimensions.width || rules.width
     const padH = canvasDimensions.height || rules.height
+    
+    // Extract colors from rules and convert to RGB format for Cloudinary
+    const titleColor = hexToRgb(rules.title.color || '#ffffff')
+    const taglineColor = hexToRgb(rules.tagline.color || '#ffffff')
+    const priceColor = hexToRgb(rules.price.color || '#ffffff')
+    const origPriceColor = hexToRgb(rules.origPrice.color || '#bbbbbb')
     
     // Calculate font sizes with percentage support
     // Title is the base (parent) for percentage calculations - use unscaled base value
@@ -590,16 +627,16 @@ function DesignPlayground() {
       `$origprice_$price_mul_1.25`, // Logic logic stays same
       `c_crop,w_1,h_1,g_north_west`, // Base crop
       `c_pad,w_${padW},h_${padH},b_$bgcolor`, // Canvas
-      `l_text:Arial_${fontSizeTitle}_bold:$(title),co_rgb:ffffff,fl_no_overflow`, // Title Layer
+      `l_text:Arial_${fontSizeTitle}_bold:$(title),co_rgb:${titleColor},fl_no_overflow`, // Title Layer
       `fl_layer_apply,g_${titleGravity},x_${titleX},y_${titleY}`,
-      `l_text:Arial_${fontSizeTagline}_italic:$(tagline),co_rgb:ffffff,fl_no_overflow`, // Tagline Layer
+      `l_text:Arial_${fontSizeTagline}_italic:$(tagline),co_rgb:${taglineColor},fl_no_overflow`, // Tagline Layer
       `fl_layer_apply,g_${taglineGravity},x_${taglineX},y_${taglineY}`,
       `l_$img`, // Image Layer
       `c_fit,w_${imgW},h_${imgH}`,
       `fl_layer_apply,g_${imgGravity},x_${imgX},y_${imgY}`,
-      `l_text:Arial_${fontSizeOrigPrice}_strikethrough:%24$(origprice),co_rgb:bbbbbb,fl_no_overflow`, // Orig Price Layer
+      `l_text:Arial_${fontSizeOrigPrice}_strikethrough:%24$(origprice),co_rgb:${origPriceColor},fl_no_overflow`, // Orig Price Layer
       `fl_layer_apply,g_${origPriceGravity},x_${origPriceX},y_${origPriceY}`,
-      `l_text:Arial_${fontSizePrice}_bold:%24$(price),co_rgb:ffffff,fl_no_overflow`, // Price Layer
+      `l_text:Arial_${fontSizePrice}_bold:%24$(price),co_rgb:${priceColor},fl_no_overflow`, // Price Layer
       `fl_layer_apply,g_${priceGravity},x_${priceX},y_${priceY}`
     ]
 
@@ -609,6 +646,187 @@ function DesignPlayground() {
   }
 
   const generatedUrl = getTransformedUrl()
+
+  // Parse URL into segments for interactive preview
+  const parseUrlSegments = () => {
+    const url = generatedUrl
+    const baseUrl = 'https://res.cloudinary.com/yoav-cloud/image/upload/'
+    const transformPart = url.replace(baseUrl, '').replace(`/${selectedAsset.publicId}.png`, '')
+    const parts = transformPart.split('/')
+    
+    const segments = []
+    
+    // Base URL
+    segments.push({ text: baseUrl, type: 'base', rowKey: null })
+    
+    // Parse transformation parts
+    parts.forEach((part, index) => {
+      let type = 'transformation'
+      let rowKey = null
+      
+      // Variable definitions
+      if (part.startsWith('$img_')) {
+        type = 'variable'
+        rowKey = 'image-layer'
+      } else if (part.startsWith('$title_') || part.includes('$title')) {
+        type = 'variable'
+        rowKey = 'title-layer'
+      } else if (part.startsWith('$tagline_') || part.includes('$tagline')) {
+        type = 'variable'
+        rowKey = 'tagline-layer'
+      } else if (part.startsWith('$price_') || part.includes('$price')) {
+        type = 'variable'
+        rowKey = part.includes('origprice') ? 'origPrice-layer' : 'price-layer'
+      } else if (part.startsWith('$bgcolor_') || part.includes('$bgcolor')) {
+        type = 'variable'
+        rowKey = 'background-color'
+      } else if (part.startsWith('c_pad')) {
+        type = 'canvas'
+        rowKey = 'canvas-dimensions'
+      } else if (part.startsWith('l_text') && part.includes('title')) {
+        type = 'layer-title'
+        rowKey = 'title-layer'
+      } else if (part.startsWith('l_text') && part.includes('tagline')) {
+        type = 'layer-tagline'
+        rowKey = 'tagline-layer'
+      } else if (part.startsWith('l_text') && part.includes('origprice')) {
+        type = 'layer-origPrice'
+        rowKey = 'origPrice-layer'
+      } else if (part.startsWith('l_text') && part.includes('price') && !part.includes('origprice')) {
+        type = 'layer-price'
+        rowKey = 'price-layer'
+      } else if (part.startsWith('l_$img')) {
+        type = 'layer-image'
+        rowKey = 'image-layer'
+      } else if (part.startsWith('fl_layer_apply')) {
+        type = 'layer-apply'
+        // Determine which layer based on context
+        if (index > 0 && parts[index - 1].includes('title')) {
+          rowKey = 'title-layer'
+        } else if (index > 0 && parts[index - 1].includes('tagline')) {
+          rowKey = 'tagline-layer'
+        } else if (index > 0 && parts[index - 1].includes('origprice')) {
+          rowKey = 'origPrice-layer'
+        } else if (index > 0 && parts[index - 1].includes('price') && !parts[index - 1].includes('origprice')) {
+          rowKey = 'price-layer'
+        } else if (index > 0 && parts[index - 1].includes('$img')) {
+          rowKey = 'image-layer'
+        }
+      }
+      
+      segments.push({ 
+        text: part, 
+        type, 
+        rowKey,
+        separator: index < parts.length - 1 ? '/' : ''
+      })
+    })
+    
+    // Public ID
+    segments.push({ text: '/', type: 'separator', rowKey: null })
+    segments.push({ text: `${selectedAsset.publicId}.png`, type: 'publicId', rowKey: null })
+    
+    return segments
+  }
+
+  const urlSegments = parseUrlSegments()
+
+  // Handle URL segment click
+  const handleSegmentClick = (rowKey) => {
+    if (rowKey) {
+      setHighlightedRow(rowKey)
+      // Clear highlight after 2 seconds
+      setTimeout(() => {
+        setHighlightedRow(null)
+      }, 2000)
+      
+      // Scroll to the first row with this key if it exists
+      const rowElement = document.querySelector(`[data-row-key="${rowKey}"]`)
+      if (rowElement) {
+        rowElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    }
+  }
+
+  // Apply/remove highlighted class to table rows
+  useEffect(() => {
+    // Remove all highlights first
+    document.querySelectorAll('[data-row-key].highlighted').forEach(el => {
+      el.classList.remove('highlighted')
+    })
+    
+    // Add highlight to matching rows
+    if (highlightedRow) {
+      document.querySelectorAll(`[data-row-key="${highlightedRow}"]`).forEach(el => {
+        el.classList.add('highlighted')
+      })
+    }
+  }, [highlightedRow])
+
+  // Helper to determine field type
+  const getFieldType = (key, layerName) => {
+    if (key === 'color') return 'color'
+    if (key === 'gravity') return 'gravity'
+    if (key === 'width' || key === 'height' || key === 'x' || key === 'y' || key === 'fontSize') return 'number'
+    return 'text'
+  }
+
+  // Helper to get gravity options
+  const getGravityOptions = () => {
+    return Object.entries(GRAVITY_VALUES).map(([key, value]) => ({
+      label: key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1').trim(),
+      value: value
+    }))
+  }
+
+  // Handle rule value update
+  const handleRuleUpdate = (category, layerName, key, value) => {
+    setEditableRules(prev => {
+      const newRules = JSON.parse(JSON.stringify(prev))
+      const designId = selectedDesign.id
+      
+      if (category === 'General') {
+        if (key === 'Width') {
+          const widthValue = parseInt(value) || 0
+          setCanvasDimensions(prev => ({ ...prev, width: widthValue }))
+          // Also update editableRules
+          if (newRules[designId]) {
+            newRules[designId].width = widthValue
+          }
+        } else if (key === 'Height') {
+          const heightValue = parseInt(value) || 0
+          setCanvasDimensions(prev => ({ ...prev, height: heightValue }))
+          // Also update editableRules
+          if (newRules[designId]) {
+            newRules[designId].height = heightValue
+          }
+        } else if (key === 'Background Color') {
+          setFormValues(prev => ({ ...prev, backgroundColor: value }))
+        }
+      } else if (category === 'Layers' && layerName) {
+        // Map layer name to key
+        const layerKey = layerName === 'Original Price' ? 'origPrice' : 
+                        layerName === 'Title' ? 'title' :
+                        layerName === 'Tagline' ? 'tagline' :
+                        layerName === 'Price' ? 'price' : 'image'
+        
+        // Update layer property
+        if (newRules[designId] && newRules[designId][layerKey]) {
+          // Convert value based on type
+          let convertedValue = value
+          if (key === 'fontSize' || key === 'width' || key === 'height' || key === 'x' || key === 'y') {
+            convertedValue = key === 'fontSize' ? (isNaN(value) ? value : parseFloat(value)) : parseInt(value) || 0
+          } else if (key === 'gravity') {
+            convertedValue = value
+          }
+          
+          newRules[designId][layerKey][key] = convertedValue
+        }
+      }
+      
+      return newRules
+    })
+  }
 
   // Track the previous URL to detect changes
   const previousUrlRef = useRef('')
@@ -865,6 +1083,13 @@ function DesignPlayground() {
                   >
                     <div className="design-name">{design.name}</div>
                     <div className="design-dims">{displayWidth} x {displayHeight}</div>
+                    <div className="design-icon-wrapper">
+                      <svg className="design-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="9" y1="3" x2="9" y2="21"></line>
+                        <line x1="3" y1="9" x2="21" y2="9"></line>
+                      </svg>
+                    </div>
                   </div>
                   {/* Tree connector line */}
                   <div className="tree-connector">
@@ -889,6 +1114,19 @@ function DesignPlayground() {
                     >
                       <div className="design-name">{design.name}</div>
                       <div className="design-dims">{displayWidth} x {displayHeight}</div>
+                      <div className="design-icon-wrapper">
+                        {design.id === 'ig-ad' ? (
+                          <svg className="design-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+                            <circle cx="12" cy="12" r="4"></circle>
+                            <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+                          </svg>
+                        ) : design.id === 'fb-mobile' ? (
+                          <svg className="design-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path>
+                          </svg>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
                 )
@@ -948,6 +1186,38 @@ function DesignPlayground() {
             </div>
           ) : (
             <div className="textual-preview">
+              {/* URL Preview Card */}
+              <div className="url-preview-card">
+                <div className="url-preview-header">
+                  <div className="url-preview-label">Transformation URL</div>
+                  <button
+                    className="url-open-button"
+                    onClick={() => window.open(generatedUrl, '_blank')}
+                    title="Open URL in new tab"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                      <polyline points="15 3 21 3 21 9"></polyline>
+                      <line x1="10" y1="14" x2="21" y2="3"></line>
+                    </svg>
+                  </button>
+                </div>
+                <div className="url-preview-content">
+                  {urlSegments.map((segment, index) => (
+                    <span
+                      key={index}
+                      className={`url-segment url-segment-${segment.type} ${segment.rowKey && highlightedRow === segment.rowKey ? 'highlighted' : ''}`}
+                      onClick={() => handleSegmentClick(segment.rowKey)}
+                      title={segment.rowKey ? `Click to highlight ${segment.rowKey}` : ''}
+                      style={{ cursor: segment.rowKey ? 'pointer' : 'default' }}
+                    >
+                      {segment.text}
+                      {segment.separator}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              
               <table className="rules-table">
                 <thead>
                   <tr>
@@ -961,20 +1231,46 @@ function DesignPlayground() {
                   <tr className="category-row">
                     <td colSpan="3"><strong>General</strong></td>
                   </tr>
-                  <tr>
+                  <tr data-row-key="canvas-dimensions">
                     <td>General</td>
                     <td>Width</td>
-                    <td>{canvasDimensions.width}</td>
+                    <td>
+                      <input
+                        type="number"
+                        value={canvasDimensions.width}
+                        onChange={(e) => handleRuleUpdate('General', null, 'Width', e.target.value)}
+                        className="rule-input rule-input-number"
+                        min="1"
+                      />
+                    </td>
                   </tr>
-                  <tr>
+                  <tr data-row-key="canvas-dimensions">
                     <td>General</td>
                     <td>Height</td>
-                    <td>{canvasDimensions.height}</td>
+                    <td>
+                      <input
+                        type="number"
+                        value={canvasDimensions.height}
+                        onChange={(e) => handleRuleUpdate('General', null, 'Height', e.target.value)}
+                        className="rule-input rule-input-number"
+                        min="1"
+                      />
+                    </td>
                   </tr>
-                  <tr>
+                  <tr data-row-key="background-color">
                     <td>General</td>
                     <td>Background Color</td>
-                    <td>{formValues.backgroundColor || '#000428'}</td>
+                    <td>
+                      <input
+                        type="color"
+                        value={formValues.backgroundColor || '#000428'}
+                        onChange={(e) => handleRuleUpdate('General', null, 'Background Color', e.target.value)}
+                        className="rule-input rule-input-color"
+                        disabled={useMetadata.backgroundColor}
+                        readOnly={useMetadata.backgroundColor}
+                        title={useMetadata.backgroundColor ? 'Using metadata value' : 'Background color'}
+                      />
+                    </td>
                   </tr>
                   
                   {/* Layer Rules */}
@@ -982,29 +1278,85 @@ function DesignPlayground() {
                     <td colSpan="3"><strong>Layers</strong></td>
                   </tr>
                   {(() => {
-                    const rules = DESIGN_RULES[selectedDesign.id] || DESIGN_RULES['parent']
+                    const rules = editableRules[selectedDesign.id] || editableRules['parent']
                     const layers = [
-                      { name: 'Title', data: rules.title },
-                      { name: 'Tagline', data: rules.tagline },
-                      { name: 'Image', data: rules.image },
-                      { name: 'Original Price', data: rules.origPrice },
-                      { name: 'Price', data: rules.price }
+                      { name: 'Title', data: rules.title, key: 'title' },
+                      { name: 'Tagline', data: rules.tagline, key: 'tagline' },
+                      { name: 'Image', data: rules.image, key: 'image' },
+                      { name: 'Original Price', data: rules.origPrice, key: 'origPrice' },
+                      { name: 'Price', data: rules.price, key: 'price' }
                     ]
                     return layers.flatMap(layer => {
                       const rows = []
+                      // Map layer names to row keys
+                      const rowKeyMap = {
+                        'Title': 'title-layer',
+                        'Tagline': 'tagline-layer',
+                        'Image': 'image-layer',
+                        'Original Price': 'origPrice-layer',
+                        'Price': 'price-layer'
+                      }
+                      const rowKey = rowKeyMap[layer.name]
+                      
                       // Add sub-category row for the layer
                       rows.push(
-                        <tr key={`${layer.name}-header`} className="sub-category-row">
+                        <tr key={`${layer.name}-header`} className="sub-category-row" data-row-key={rowKey}>
                           <td colSpan="3"><strong>{layer.name}</strong></td>
                         </tr>
                       )
                       // Add property rows without layer name
                       Object.entries(layer.data).forEach(([key, value]) => {
+                        const fieldType = getFieldType(key, layer.name)
+                        const currentValue = value
+                        
+                        let inputElement
+                        if (fieldType === 'color') {
+                          inputElement = (
+                            <input
+                              type="color"
+                              value={currentValue || '#ffffff'}
+                              onChange={(e) => handleRuleUpdate('Layers', layer.name, key, e.target.value)}
+                              className="rule-input rule-input-color"
+                            />
+                          )
+                        } else if (fieldType === 'gravity') {
+                          inputElement = (
+                            <select
+                              value={currentValue}
+                              onChange={(e) => handleRuleUpdate('Layers', layer.name, key, e.target.value)}
+                              className="rule-input rule-input-select"
+                            >
+                              {getGravityOptions().map(opt => (
+                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                              ))}
+                            </select>
+                          )
+                        } else if (fieldType === 'number') {
+                          inputElement = (
+                            <input
+                              type="number"
+                              value={currentValue}
+                              onChange={(e) => handleRuleUpdate('Layers', layer.name, key, e.target.value)}
+                              className="rule-input rule-input-number"
+                              step={key === 'fontSize' ? '0.1' : '1'}
+                            />
+                          )
+                        } else {
+                          inputElement = (
+                            <input
+                              type="text"
+                              value={String(currentValue)}
+                              onChange={(e) => handleRuleUpdate('Layers', layer.name, key, e.target.value)}
+                              className="rule-input rule-input-text"
+                            />
+                          )
+                        }
+                        
                         rows.push(
-                          <tr key={`${layer.name}-${key}`}>
+                          <tr key={`${layer.name}-${key}`} data-row-key={rowKey}>
                             <td></td>
                             <td>{key}</td>
-                            <td>{String(value)}</td>
+                            <td>{inputElement}</td>
                           </tr>
                         )
                       })
