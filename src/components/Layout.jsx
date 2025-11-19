@@ -25,6 +25,12 @@ function Layout({ children }) {
               </button>
               <button
                 className="layout-nav-link"
+                onClick={() => navigate('/playground')}
+              >
+                Design Playground
+              </button>
+              <button
+                className="layout-nav-link"
                 onClick={() => navigate('/preferences')}
               >
                 Preferences

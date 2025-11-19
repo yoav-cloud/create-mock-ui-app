@@ -40,31 +40,33 @@ function GenerationResults({ designId }) {
   const channels = useMemo(() => {
     let channelsList = []
     
-    if (subDesigns.length > 0) {
-      // Get channels from sub-designs
-      channelsList = subDesigns
-        .filter(sub => sub.channelId)
-        .map(sub => {
-          const channel = channelsData.find(c => c.id === sub.channelId)
-          return channel ? { ...channel, subDesignId: sub.id } : null
-        })
-        .filter(Boolean)
-      
-      // If includeParent is true, add parent design as a channel (without channelId)
-      if (includeParent && design && !design.parentId) {
-        channelsList.unshift({
-          id: 'parent',
-          name: design.name || 'Parent Design',
-          transformation_string: '',
-          output_format: 'png',
-          max_file_size: null,
-          isParent: true,
-          designId: designId
-        })
-      }
-    } else {
-      // No sub-designs, use default channels
-      channelsList = channelsData.slice(0, 3)
+    // Only process if this is a parent design (not a sub-design)
+    if (!design || design.parentId) {
+      return channelsList // Sub-designs shouldn't show generation results
+    }
+    
+    // Get channels from actual sub-designs that have channelId
+    const subDesignChannels = subDesigns
+      .filter(sub => sub.channelId)
+      .map(sub => {
+        const channel = channelsData.find(c => c.id === sub.channelId)
+        return channel ? { ...channel, subDesignId: sub.id } : null
+      })
+      .filter(Boolean)
+    
+    channelsList = [...subDesignChannels]
+    
+    // If includeParent is true, add parent design as a channel
+    if (includeParent) {
+      channelsList.unshift({
+        id: 'parent',
+        name: design.name || 'Parent Design',
+        transformation_string: '',
+        output_format: 'png',
+        max_file_size: null,
+        isParent: true,
+        designId: designId
+      })
     }
     
     return channelsList
@@ -194,6 +196,26 @@ function GenerationResults({ designId }) {
         </div>
         <div className="generation-table-empty-state">
           <p>No generation data available. Upload CSV and start generation first.</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (channels.length === 0) {
+    return (
+      <div className="generation-page">
+        <div className="generation-header">
+          <h2 className="generation-title">Generation Results</h2>
+          <p className="generation-subtitle">
+            View and manage your generated design variations
+          </p>
+        </div>
+        <div className="generation-table-empty-state">
+          <p>
+            {design?.parentId 
+              ? 'Generation results are only available for parent designs.'
+              : 'No sub-designs with channels found. Create sub-designs and assign channels to generate assets.'}
+          </p>
         </div>
       </div>
     )

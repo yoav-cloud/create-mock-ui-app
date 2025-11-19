@@ -11,6 +11,7 @@ import Templates from './pages/Templates'
 import Editor from './pages/Editor'
 import BrandCenter from './pages/BrandCenter'
 import Preferences from './pages/Preferences'
+import DesignPlayground from './pages/DesignPlayground'
 
 function App() {
   return (
@@ -27,6 +28,7 @@ function App() {
             <Route path="/editor/:designId" element={<Editor />} />
             <Route path="/brand-center" element={<BrandCenter />} />
             <Route path="/preferences" element={<Preferences />} />
+            <Route path="/playground" element={<DesignPlayground />} />
           </Routes>
           <Toaster 
             position="top-right"
