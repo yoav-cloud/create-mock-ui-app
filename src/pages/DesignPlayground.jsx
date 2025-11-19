@@ -49,7 +49,55 @@ const DESIGN_TYPES = [
 
 const BASE_WIDTH = 500
 
+const GRAVITY_VALUES = {
+  northEast: 'north_east',
+  north: 'north',
+  northWest: 'north_west',
+  west: 'west',
+  southWest: 'south_west',
+  south: 'south',
+  southEast: 'south_east',
+  east: 'east',
+  center: 'center'
+}
+
+
+
+
 const LIGHT_BLUE = '#03a9f4'
+
+// Design positioning rules - one entry per design type
+// Each rule contains: width, height (canvas dimensions), x, y, gravity, fontSize (and width/height for image)
+// fontSize can be a number (absolute) or a string with percentage (e.g., "50%") relative to a parent value
+const DESIGN_RULES = {
+  'parent': {
+    width: 500,
+    height: 900,
+    title: { x: 30, y: 40, gravity: GRAVITY_VALUES.northWest, fontSize: 32 },
+    tagline: { x: 30, y: 120, gravity: GRAVITY_VALUES.northEast, fontSize: 20 },
+    image: { width: 300, height: 300, x: 10, y: 30, gravity: GRAVITY_VALUES.southEast },
+    origPrice: { x: 30, y: 40, gravity: GRAVITY_VALUES.southWest, fontSize: 30 },
+    price: { x: 130, y: 40, gravity: GRAVITY_VALUES.southWest, fontSize: 44 }
+  },
+  'ig-ad': {
+    width: 1080,
+    height: 1080,
+    title: { x: 0, y: 65, gravity: GRAVITY_VALUES.north, fontSize: 32 },
+    tagline: { x: 0, y: 100, gravity: GRAVITY_VALUES.north, fontSize: 20 },
+    image: { width: 350, height: 250, x: 0, y: 120, gravity: GRAVITY_VALUES.north },
+    origPrice: { x: -50, y: 60, gravity: GRAVITY_VALUES.south, fontSize: 30 },
+    price: { x: 50, y: 50, gravity: GRAVITY_VALUES.south, fontSize: 44 }
+  },
+  'fb-mobile': {
+    width: 1080,
+    height: 1350,
+    title: { x: 0, y: 30, gravity: GRAVITY_VALUES.north, fontSize: 32 },
+    tagline: { x: 0, y: 60, gravity: GRAVITY_VALUES.south, fontSize: 20 },
+    image: { width: 380, height: 280, x: 0, y: 60, gravity: GRAVITY_VALUES.center },
+    origPrice: { x: 0, y: -160, gravity: GRAVITY_VALUES.center, fontSize: 30 },
+    price: { x: 0, y: -120, gravity: GRAVITY_VALUES.center, fontSize: 44 }
+  }
+}
 
 function DesignPlayground() {
   const [selectedAsset, setSelectedAsset] = useState(() => {
@@ -71,6 +119,23 @@ function DesignPlayground() {
       backgroundColor: '#000428'
     }
   })
+
+  // Canvas dimensions state - initialized from rules
+  const [canvasDimensions, setCanvasDimensions] = useState(() => {
+    const saved = localStorage.getItem('playground_canvas_dimensions')
+    if (saved) {
+      return JSON.parse(saved)
+    }
+    // Initialize from current design rules
+    const currentRules = DESIGN_RULES[selectedDesign.id] || DESIGN_RULES['parent']
+    return {
+      width: currentRules.width,
+      height: currentRules.height
+    }
+  })
+
+  // Preview tab state (visual or textual)
+  const [previewTab, setPreviewTab] = useState('visual')
 
   const [useMetadata, setUseMetadata] = useState(() => {
     const saved = localStorage.getItem('playground_metadata_toggles')
@@ -113,6 +178,20 @@ function DesignPlayground() {
   useEffect(() => {
     localStorage.setItem('playground_saved_values', JSON.stringify(savedValues))
   }, [savedValues])
+
+  useEffect(() => {
+    localStorage.setItem('playground_canvas_dimensions', JSON.stringify(canvasDimensions))
+  }, [canvasDimensions])
+
+  // Update canvas dimensions when design changes (if not already customized)
+  useEffect(() => {
+    const rules = DESIGN_RULES[selectedDesign.id] || DESIGN_RULES['parent']
+    // Update to match the new design's default dimensions
+    setCanvasDimensions({
+      width: rules.width,
+      height: rules.height
+    })
+  }, [selectedDesign.id]) // Only depend on design ID
 
   // Helper to extract metadata ID from {id} syntax
   const extractMetadataId = (value) => {
@@ -230,6 +309,18 @@ function DesignPlayground() {
   const getTransformedUrl = () => {
     const scale = selectedDesign.width / BASE_WIDTH
     const s = (val) => Math.round(val * scale)
+    
+    // Helper function to calculate font size with percentage support
+    // fontSize can be a number (absolute) or a string like "50%" (relative to parentValue)
+    const calculateFontSize = (fontSize, parentValue, scaleFn) => {
+      if (typeof fontSize === 'string' && fontSize.endsWith('%')) {
+        // Percentage value: calculate relative to parent
+        const percentage = parseFloat(fontSize) / 100
+        return scaleFn(parentValue * percentage)
+      }
+      // Absolute value
+      return scaleFn(fontSize)
+    }
     
     const escapeCloudinaryString = (str) => {
       return encodeURIComponent(str).replace(/!/g, '%21')
@@ -444,36 +535,49 @@ function DesignPlayground() {
     const publicIdClean = selectedAsset.publicId.replace(/\//g, ':')
     const imgVar = `!${publicIdClean}!`
     
-    // Scale values
-    const fontSizeTitle = s(32)  // Reduced from 60
-    const fontSizeTagline = s(20)  // Reduced from 40
-    const fontSizePrice = s(44)  // Keep as is
-    const fontSizeOrigPrice = s(30)
+    // Get positioning rules for the selected design type
+    const rules = DESIGN_RULES[selectedDesign.id] || DESIGN_RULES['parent']
     
-    const padW = selectedDesign.width
-    const padH = selectedDesign.height
+    // Use canvas dimensions from state (editable) or fallback to rules
+    const padW = canvasDimensions.width || rules.width
+    const padH = canvasDimensions.height || rules.height
     
-    // Positions
-    // Title
-    const titleX = s(30)
-    const titleY = s(40)
+    // Calculate font sizes with percentage support
+    // Title is the base (parent) for percentage calculations - use unscaled base value
+    const baseTitleSize = typeof rules.title.fontSize === 'string' && rules.title.fontSize.endsWith('%')
+      ? 32 // Default base if title itself is percentage (shouldn't happen, but fallback)
+      : rules.title.fontSize
     
-    // Tagline
-    const taglineY = s(120)
+    // Calculate title font size (scaled)
+    const fontSizeTitle = calculateFontSize(rules.title.fontSize, baseTitleSize, s)
     
-    // Image
-    const imgW = s(300)
-    const imgH = s(300)
-    const imgX = s(10)
-    const imgY = s(30)
+    // Calculate other font sizes relative to title's base (unscaled) value, then scale
+    const fontSizeTagline = calculateFontSize(rules.tagline.fontSize, baseTitleSize, s)
+    const fontSizePrice = calculateFontSize(rules.price.fontSize, baseTitleSize, s)
+    const fontSizeOrigPrice = calculateFontSize(rules.origPrice.fontSize, baseTitleSize, s)
     
-    // Orig Price
-    const origPriceX = s(30)
-    const origPriceY = s(40)
+    // Apply rules with scaling
+    const titleX = s(rules.title.x)
+    const titleY = s(rules.title.y)
+    const titleGravity = rules.title.gravity
     
-    // Price
-    const priceX = s(130)
-    const priceY = s(40)
+    const taglineX = s(rules.tagline.x)
+    const taglineY = s(rules.tagline.y)
+    const taglineGravity = rules.tagline.gravity
+    
+    const imgW = s(rules.image.width)
+    const imgH = s(rules.image.height)
+    const imgX = s(rules.image.x)
+    const imgY = s(rules.image.y)
+    const imgGravity = rules.image.gravity
+    
+    const origPriceX = s(rules.origPrice.x)
+    const origPriceY = s(rules.origPrice.y)
+    const origPriceGravity = rules.origPrice.gravity
+    
+    const priceX = s(rules.price.x)
+    const priceY = s(rules.price.y)
+    const priceGravity = rules.price.gravity
 
     // Construct transformation
     
@@ -487,16 +591,16 @@ function DesignPlayground() {
       `c_crop,w_1,h_1,g_north_west`, // Base crop
       `c_pad,w_${padW},h_${padH},b_$bgcolor`, // Canvas
       `l_text:Arial_${fontSizeTitle}_bold:$(title),co_rgb:ffffff,fl_no_overflow`, // Title Layer
-      `fl_layer_apply,g_north_west,x_${titleX},y_${titleY}`,
+      `fl_layer_apply,g_${titleGravity},x_${titleX},y_${titleY}`,
       `l_text:Arial_${fontSizeTagline}_italic:$(tagline),co_rgb:ffffff,fl_no_overflow`, // Tagline Layer
-      `fl_layer_apply,g_north,y_${taglineY}`,
+      `fl_layer_apply,g_${taglineGravity},x_${taglineX},y_${taglineY}`,
       `l_$img`, // Image Layer
       `c_fit,w_${imgW},h_${imgH}`,
-      `fl_layer_apply,g_south_east,x_${imgX},y_${imgY}`,
+      `fl_layer_apply,g_${imgGravity},x_${imgX},y_${imgY}`,
       `l_text:Arial_${fontSizeOrigPrice}_strikethrough:%24$(origprice),co_rgb:bbbbbb,fl_no_overflow`, // Orig Price Layer
-      `fl_layer_apply,g_south_west,x_${origPriceX},y_${origPriceY}`,
+      `fl_layer_apply,g_${origPriceGravity},x_${origPriceX},y_${origPriceY}`,
       `l_text:Arial_${fontSizePrice}_bold:%24$(price),co_rgb:ffffff,fl_no_overflow`, // Price Layer
-      `fl_layer_apply,g_south_west,x_${priceX},y_${priceY}`
+      `fl_layer_apply,g_${priceGravity},x_${priceX},y_${priceY}`
     ]
 
     const transformString = transformParts.join('/')
@@ -746,50 +850,171 @@ function DesignPlayground() {
         {/* Left: Designs */}
         <div className="design-selector">
           <h3>Channels</h3>
-          {DESIGN_TYPES.map(design => (
-            <div 
-              key={design.id}
-              className={`design-option ${selectedDesign.id === design.id ? 'active' : ''}`}
-              onClick={() => setSelectedDesign(design)}
-            >
-              <div className="design-name">{design.name}</div>
-              <div className="design-dims">{design.width} x {design.height}</div>
+          <div className="design-tree">
+            {/* Parent Design */}
+            {DESIGN_TYPES.filter(d => d.id === 'parent').map(design => {
+              const rules = DESIGN_RULES[design.id] || DESIGN_RULES['parent']
+              const isSelected = selectedDesign.id === design.id
+              const displayWidth = isSelected ? canvasDimensions.width : rules.width
+              const displayHeight = isSelected ? canvasDimensions.height : rules.height
+              return (
+                <div key={design.id}>
+                  <div 
+                    className={`design-option parent ${isSelected ? 'active' : ''}`}
+                    onClick={() => setSelectedDesign(design)}
+                  >
+                    <div className="design-name">{design.name}</div>
+                    <div className="design-dims">{displayWidth} x {displayHeight}</div>
+                  </div>
+                  {/* Tree connector line */}
+                  <div className="tree-connector">
+                    <div className="tree-line-vertical"></div>
+                    <div className="tree-line-horizontal"></div>
+                  </div>
+                </div>
+              )
+            })}
+            {/* Sub-designs */}
+            <div className="sub-designs-container">
+              {DESIGN_TYPES.filter(d => d.id !== 'parent').map((design) => {
+                const rules = DESIGN_RULES[design.id] || DESIGN_RULES['parent']
+                const isSelected = selectedDesign.id === design.id
+                const displayWidth = isSelected ? canvasDimensions.width : rules.width
+                const displayHeight = isSelected ? canvasDimensions.height : rules.height
+                return (
+                  <div key={design.id} className="sub-design-wrapper">
+                    <div 
+                      className={`design-option sub ${isSelected ? 'active' : ''}`}
+                      onClick={() => setSelectedDesign(design)}
+                    >
+                      <div className="design-name">{design.name}</div>
+                      <div className="design-dims">{displayWidth} x {displayHeight}</div>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
-          ))}
+          </div>
         </div>
 
         {/* Center: Preview */}
         <div className="preview-area">
-          <div className="preview-wrapper" style={{ aspectRatio: `${selectedDesign.width}/${selectedDesign.height}` }}>
-            {imageLoading && (
-              <div className="loading-overlay">
-                <div className="spinner"></div>
-              </div>
-            )}
-            {/* Background image (previous successful load) */}
-            {currentImageUrl && currentImageUrl !== generatedUrl && !imageError && (
-               <img 
-               src={currentImageUrl} 
-               alt="Design Preview Previous" 
-               className="preview-image previous"
-             />
-            )}
-            {/* Foreground image (loading) */}
-            {!imageError ? (
-              <img 
-                src={generatedUrl} 
-                alt="Design Preview" 
-                className={`preview-image current ${imageLoading ? 'loading' : ''}`}
-                onLoad={handleImageLoad}
-                onError={handleImageError}
-              />
-            ) : (
-              <div className="broken-image-placeholder">
-                <div className="broken-icon">⚠️</div>
-                <div className="broken-text">Image failed to load</div>
-              </div>
-            )}
+          {/* Tab Switcher */}
+          <div className="preview-tabs">
+            <button
+              className={`preview-tab ${previewTab === 'visual' ? 'active' : ''}`}
+              onClick={() => setPreviewTab('visual')}
+            >
+              Visual
+            </button>
+            <button
+              className={`preview-tab ${previewTab === 'textual' ? 'active' : ''}`}
+              onClick={() => setPreviewTab('textual')}
+            >
+              Rules
+            </button>
           </div>
+
+          {previewTab === 'visual' ? (
+            <div className="preview-wrapper" style={{ aspectRatio: `${canvasDimensions.width}/${canvasDimensions.height}` }}>
+              {imageLoading && (
+                <div className="loading-overlay">
+                  <div className="spinner"></div>
+                </div>
+              )}
+              {/* Background image (previous successful load) */}
+              {currentImageUrl && currentImageUrl !== generatedUrl && !imageError && (
+                 <img 
+                 src={currentImageUrl} 
+                 alt="Design Preview Previous" 
+                 className="preview-image previous"
+               />
+              )}
+              {/* Foreground image (loading) */}
+              {!imageError ? (
+                <img 
+                  src={generatedUrl} 
+                  alt="Design Preview" 
+                  className={`preview-image current ${imageLoading ? 'loading' : ''}`}
+                  onLoad={handleImageLoad}
+                  onError={handleImageError}
+                />
+              ) : (
+                <div className="broken-image-placeholder">
+                  <div className="broken-icon">⚠️</div>
+                  <div className="broken-text">Image failed to load</div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="textual-preview">
+              <table className="rules-table">
+                <thead>
+                  <tr>
+                    <th>Category</th>
+                    <th>Property</th>
+                    <th>Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {/* General Rules */}
+                  <tr className="category-row">
+                    <td colSpan="3"><strong>General</strong></td>
+                  </tr>
+                  <tr>
+                    <td>General</td>
+                    <td>Width</td>
+                    <td>{canvasDimensions.width}</td>
+                  </tr>
+                  <tr>
+                    <td>General</td>
+                    <td>Height</td>
+                    <td>{canvasDimensions.height}</td>
+                  </tr>
+                  <tr>
+                    <td>General</td>
+                    <td>Background Color</td>
+                    <td>{formValues.backgroundColor || '#000428'}</td>
+                  </tr>
+                  
+                  {/* Layer Rules */}
+                  <tr className="category-row">
+                    <td colSpan="3"><strong>Layers</strong></td>
+                  </tr>
+                  {(() => {
+                    const rules = DESIGN_RULES[selectedDesign.id] || DESIGN_RULES['parent']
+                    const layers = [
+                      { name: 'Title', data: rules.title },
+                      { name: 'Tagline', data: rules.tagline },
+                      { name: 'Image', data: rules.image },
+                      { name: 'Original Price', data: rules.origPrice },
+                      { name: 'Price', data: rules.price }
+                    ]
+                    return layers.flatMap(layer => {
+                      const rows = []
+                      // Add sub-category row for the layer
+                      rows.push(
+                        <tr key={`${layer.name}-header`} className="sub-category-row">
+                          <td colSpan="3"><strong>{layer.name}</strong></td>
+                        </tr>
+                      )
+                      // Add property rows without layer name
+                      Object.entries(layer.data).forEach(([key, value]) => {
+                        rows.push(
+                          <tr key={`${layer.name}-${key}`}>
+                            <td></td>
+                            <td>{key}</td>
+                            <td>{String(value)}</td>
+                          </tr>
+                        )
+                      })
+                      return rows
+                    })
+                  })()}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         {/* Right: Controls */}
@@ -799,6 +1024,55 @@ function DesignPlayground() {
           {/* General Section */}
           <div className="control-section">
             <h4 className="section-title">General</h4>
+            
+            <div className="control-group">
+              <div className="label-row">
+                <label>Width</label>
+              </div>
+              <input
+                type="number"
+                name="width"
+                value={canvasDimensions.width}
+                onChange={(e) => {
+                  const value = parseInt(e.target.value) || 0
+                  setCanvasDimensions(prev => ({ ...prev, width: value }))
+                }}
+                min="1"
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  border: '1px solid #444',
+                  borderRadius: '4px',
+                  backgroundColor: '#2a2a2a',
+                  color: '#fff'
+                }}
+              />
+            </div>
+
+            <div className="control-group">
+              <div className="label-row">
+                <label>Height</label>
+              </div>
+              <input
+                type="number"
+                name="height"
+                value={canvasDimensions.height}
+                onChange={(e) => {
+                  const value = parseInt(e.target.value) || 0
+                  setCanvasDimensions(prev => ({ ...prev, height: value }))
+                }}
+                min="1"
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  border: '1px solid #444',
+                  borderRadius: '4px',
+                  backgroundColor: '#2a2a2a',
+                  color: '#fff'
+                }}
+              />
+            </div>
+
             <div className="control-group">
               <div className="label-row">
                 <label>Background Color</label>
