@@ -293,7 +293,7 @@
   z-index: 2;
 }
 
-.design-option.parent::after {
+/* .design-option.parent::after {
   content: '📐';
   position: absolute;
   right: 0.75rem;
@@ -301,7 +301,7 @@
   font-size: 0.9rem;
   opacity: 0.5;
   pointer-events: none;
-}
+} */
 
 /* Center Preview */
 .preview-area {
@@ -413,15 +413,21 @@
 }
 
 .url-preview-content {
-  font-size: 0.7rem;
+  font-size: 0;
   line-height: 1.6;
   word-break: break-all;
   color: #ccc;
+  letter-spacing: 0;
+  overflow-wrap: break-word;
+}
+
+.url-preview-content .url-segment {
+  font-size: 0.7rem;
+  display: inline;
 }
 
 .url-segment {
   transition: all 0.3s ease;
-  padding: 2px 4px;
   border-radius: 3px;
   display: inline;
 }

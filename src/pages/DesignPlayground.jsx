@@ -427,14 +427,6 @@ function DesignPlayground() {
   const isInitialLoad = useRef(true)
   // Store previous fontSize values for validation/revert
   const fontSizePreviousValues = useRef({})
-  const [showVerboseUrl, setShowVerboseUrl] = useState(() => {
-    const saved = localStorage.getItem('playground_verbose')
-    return saved !== null ? JSON.parse(saved) : true // Default to verbose (Cloudinary standard)
-  })
-
-  useEffect(() => {
-    localStorage.setItem('playground_verbose', JSON.stringify(showVerboseUrl))
-  }, [showVerboseUrl])
   
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -1374,75 +1366,6 @@ function DesignPlayground() {
     }
   }
 
-  const getNonVerboseUrl = () => {
-    // Non-verbose: Show a formatted, more readable version of the URL
-    // Break it into logical sections with line breaks for better readability
-    const fullUrl = getTransformedUrl()
-    const baseUrl = 'https://res.cloudinary.com/yoav-cloud/image/upload'
-    
-    // Extract the transformation part
-    const transformMatch = fullUrl.match(/\/image\/upload\/(.+)\/(.+\.png)/)
-    if (!transformMatch) return fullUrl
-    
-    const transformString = transformMatch[1]
-    const publicId = transformMatch[2]
-    
-    // Split transformation into logical groups for readability
-    const parts = transformString.split('/')
-    
-    // Group parts: variables, canvas setup, layers
-    const variables = []
-    const canvas = []
-    const layers = []
-    
-    for (let i = 0; i < parts.length; i++) {
-      const part = parts[i]
-      
-      // Variables start with $
-      if (part.startsWith('$')) {
-        variables.push(part)
-      }
-      // Canvas operations
-      else if (part.startsWith('c_')) {
-        canvas.push(part)
-      }
-      // Layer operations
-      else if (part.startsWith('l_') || part.startsWith('fl_layer_apply')) {
-        layers.push(part)
-      }
-      // Other operations (like if conditions)
-      else {
-        // Check if it's part of a variable definition (if conditions)
-        if (part.startsWith('if_') || part === 'if_end') {
-          variables.push(part)
-        } else {
-          layers.push(part)
-        }
-      }
-    }
-    
-    // Format as readable sections with comments
-    const sections = [baseUrl]
-    
-    if (variables.length > 0) {
-      sections.push('// Variables:')
-      variables.forEach(v => sections.push(`  ${v}`))
-    }
-    
-    if (canvas.length > 0) {
-      sections.push('// Canvas:')
-      canvas.forEach(c => sections.push(`  ${c}`))
-    }
-    
-    if (layers.length > 0) {
-      sections.push('// Layers:')
-      layers.forEach(l => sections.push(`  ${l}`))
-    }
-    
-    sections.push(`/${publicId}`)
-    
-    return sections.join('\n')
-  }
 
   return (
     <div className="playground-container">
@@ -1641,7 +1564,7 @@ function DesignPlayground() {
                       style={{ cursor: segment.rowKey ? 'pointer' : 'default' }}
                     >
                       {segment.text}
-                      {segment.separator}
+                      {segment.separator && <span>{segment.separator}</span>}
                     </span>
                   ))}
                 </div>
@@ -2799,12 +2722,6 @@ function DesignPlayground() {
             <div className="url-header">
               <label>Generated URL</label>
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                <div className="toggle-wrapper" onClick={() => setShowVerboseUrl(!showVerboseUrl)} style={{ cursor: 'pointer' }}>
-                  <div className={`toggle-track ${showVerboseUrl ? 'active' : ''}`} style={{ width: '32px', height: '18px' }}>
-                    <div className="toggle-thumb" style={{ width: '14px', height: '14px', top: '2px', left: '2px' }}></div>
-                  </div>
-                  <span className="toggle-label" style={{ fontSize: '0.65rem' }}>Verbose</span>
-                </div>
                 <button 
                   className="copy-btn"
                   onClick={handleCopy}
@@ -2814,7 +2731,7 @@ function DesignPlayground() {
               </div>
             </div>
             <div className="url-display">
-              {showVerboseUrl ? generatedUrl : getNonVerboseUrl()}
+              {getTransformedUrl()}
             </div>
           </div>
         </div>
