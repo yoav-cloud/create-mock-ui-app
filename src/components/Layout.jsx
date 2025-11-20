@@ -1,8 +1,9 @@
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import './Layout.css'
 
 function Layout({ children }) {
   const navigate = useNavigate()
+  const location = useLocation()
 
   return (
     <div className="layout">
@@ -18,19 +19,19 @@ function Layout({ children }) {
             </h1>
             <nav className="layout-nav">
               <button
-                className="layout-nav-link"
+                className={`layout-nav-link ${location.pathname === '/brand-center' ? 'active' : ''}`}
                 onClick={() => navigate('/brand-center')}
               >
                 Brand Center
               </button>
               <button
-                className="layout-nav-link"
+                className={`layout-nav-link ${location.pathname === '/playground' ? 'active' : ''}`}
                 onClick={() => navigate('/playground')}
               >
                 Design Playground
               </button>
               <button
-                className="layout-nav-link"
+                className={`layout-nav-link ${location.pathname === '/preferences' ? 'active' : ''}`}
                 onClick={() => navigate('/preferences')}
               >
                 Preferences

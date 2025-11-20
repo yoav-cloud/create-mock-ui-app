@@ -63,6 +63,12 @@
   background-color: var(--color-surface);
 }
 
+.layout-nav-link.active {
+  color: var(--color-primary);
+  background-color: var(--color-surface);
+  font-weight: 600;
+}
+
 @media (max-width: 768px) {
   .layout-header-content {
     flex-direction: column;
