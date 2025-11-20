@@ -170,6 +170,41 @@
 .design-option.parent {
   position: relative;
   margin-bottom: 0.75rem;
+  transition: all 0.3s ease;
+  overflow: visible; /* Allow toggles to be visible */
+}
+
+.design-card-content {
+  position: relative;
+  z-index: 1;
+}
+
+/* Inheritance toggles container - inside card flow */
+.inheritance-toggles {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background-color: #1a1a1a;
+  border: 1px solid #444;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  z-index: 2;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  position: relative; /* Keep in flow but allow proper stacking */
+}
+
+.inheritance-toggle-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.inheritance-toggle-item label {
+  font-size: 0.85rem;
+  color: #ccc;
+  font-weight: 500;
 }
 
 /* Ensure consistent width for sub-design cards, but allow natural height */

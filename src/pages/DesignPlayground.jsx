@@ -89,29 +89,29 @@ const DESIGN_RULES = {
   'parent': {
     width: 500,
     height: 900,
-    title: { x: 30, y: 40, gravity: GRAVITY_VALUES.northWest, fontSize: 32, color: '#ffffff', font: 'Arial' },
-    tagline: { x: 30, y: 120, gravity: GRAVITY_VALUES.northEast, fontSize: 20, color: '#ffffff', font: 'Arial' },
+    title: { x: 30, y: 40, gravity: GRAVITY_VALUES.northWest, fontSize: 32, color: '#ffffff', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false },
+    tagline: { x: 30, y: 120, gravity: GRAVITY_VALUES.northEast, fontSize: 20, color: '#ffffff', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false },
     image: { width: 300, height: 300, x: 10, y: 30, gravity: GRAVITY_VALUES.southEast },
-    origPrice: { x: 30, y: 40, gravity: GRAVITY_VALUES.southWest, fontSize: 30, color: '#bbbbbb', font: 'Arial' },
-    price: { x: 130, y: 40, gravity: GRAVITY_VALUES.southWest, fontSize: 44, color: '#ffffff', font: 'Arial' }
+    origPrice: { x: 30, y: 40, gravity: GRAVITY_VALUES.southWest, fontSize: 30, color: '#bbbbbb', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false },
+    price: { x: 130, y: 40, gravity: GRAVITY_VALUES.southWest, fontSize: 44, color: '#ffffff', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false }
   },
   'ig-ad': {
     width: 1080,
     height: 1080,
-    title: { x: 0, y: 65, gravity: GRAVITY_VALUES.north, fontSize: 32, color: '#ffffff', font: 'Arial' },
-    tagline: { x: 0, y: 100, gravity: GRAVITY_VALUES.north, fontSize: 20, color: '#ffffff', font: 'Arial' },
+    title: { x: 0, y: 65, gravity: GRAVITY_VALUES.north, fontSize: 32, color: '#ffffff', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false },
+    tagline: { x: 0, y: 100, gravity: GRAVITY_VALUES.north, fontSize: 20, color: '#ffffff', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false },
     image: { width: 350, height: 250, x: 0, y: 120, gravity: GRAVITY_VALUES.north },
-    origPrice: { x: -50, y: 60, gravity: GRAVITY_VALUES.south, fontSize: 30, color: '#bbbbbb', font: 'Arial' },
-    price: { x: 50, y: 50, gravity: GRAVITY_VALUES.south, fontSize: 44, color: '#ffffff', font: 'Arial' }
+    origPrice: { x: -50, y: 60, gravity: GRAVITY_VALUES.south, fontSize: 30, color: '#bbbbbb', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false },
+    price: { x: 50, y: 50, gravity: GRAVITY_VALUES.south, fontSize: 44, color: '#ffffff', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false }
   },
   'fb-mobile': {
     width: 1080,
     height: 1350,
-    title: { x: 0, y: 30, gravity: GRAVITY_VALUES.north, fontSize: 32, color: '#ffffff', font: 'Arial' },
-    tagline: { x: 0, y: 60, gravity: GRAVITY_VALUES.south, fontSize: 20, color: '#ffffff', font: 'Arial' },
+    title: { x: 0, y: 30, gravity: GRAVITY_VALUES.north, fontSize: 32, color: '#ffffff', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false },
+    tagline: { x: 0, y: 60, gravity: GRAVITY_VALUES.south, fontSize: 20, color: '#ffffff', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false },
     image: { width: 380, height: 280, x: 0, y: 60, gravity: GRAVITY_VALUES.center },
-    origPrice: { x: 0, y: -160, gravity: GRAVITY_VALUES.center, fontSize: 30, color: '#bbbbbb', font: 'Arial' },
-    price: { x: 0, y: -120, gravity: GRAVITY_VALUES.center, fontSize: 44, color: '#ffffff', font: 'Arial' }
+    origPrice: { x: 0, y: -160, gravity: GRAVITY_VALUES.center, fontSize: 30, color: '#bbbbbb', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false },
+    price: { x: 0, y: -120, gravity: GRAVITY_VALUES.center, fontSize: 44, color: '#ffffff', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false }
   }
 }
 
@@ -216,6 +216,25 @@ function DesignPlayground() {
     }
   })
 
+  // Inheritance toggles state
+  const [inheritanceToggles, setInheritanceToggles] = useState(() => {
+    const saved = localStorage.getItem('playground_inheritance_toggles')
+    return saved ? JSON.parse(saved) : {
+      inheritStyles: true,  // ON by default, disabled
+      inheritAll: false      // OFF by default, can be changed
+    }
+  })
+
+  // Track which properties are overridden (not inherited) for each child design
+  // Structure: { 'ig-ad': { 'title': { 'color': true, 'font': false }, ... }, ... }
+  const [propertyOverrides, setPropertyOverrides] = useState(() => {
+    const saved = localStorage.getItem('playground_property_overrides')
+    return saved ? JSON.parse(saved) : {}
+  })
+
+  // Parent card hover state
+  const [isParentHovered, setIsParentHovered] = useState(false)
+
   // Save state to localStorage whenever it changes
   useEffect(() => {
     localStorage.setItem('playground_asset', selectedAsset.id)
@@ -244,6 +263,14 @@ function DesignPlayground() {
   useEffect(() => {
     localStorage.setItem('playground_editable_rules', JSON.stringify(editableRules))
   }, [editableRules])
+
+  useEffect(() => {
+    localStorage.setItem('playground_inheritance_toggles', JSON.stringify(inheritanceToggles))
+  }, [inheritanceToggles])
+
+  useEffect(() => {
+    localStorage.setItem('playground_property_overrides', JSON.stringify(propertyOverrides))
+  }, [propertyOverrides])
 
   // Update canvas dimensions when design changes
   useEffect(() => {
@@ -660,6 +687,24 @@ function DesignPlayground() {
     const origPriceFont = fontToKebabCase(rules.origPrice.font || 'Arial')
     const priceFont = fontToKebabCase(rules.price.font || 'Arial')
 
+    // Helper to build text layer flags array
+    const buildTextFlags = (layerRules) => {
+      const flags = []
+      if (layerRules.flNoOverflow) {
+        flags.push('fl_no_overflow')
+      }
+      if (layerRules.flTextDisallowOverflow) {
+        flags.push('fl_text_disallow_overflow')
+      }
+      return flags
+    }
+
+    // Build flags for each text layer
+    const titleFlags = buildTextFlags(rules.title)
+    const taglineFlags = buildTextFlags(rules.tagline)
+    const origPriceFlags = buildTextFlags(rules.origPrice)
+    const priceFlags = buildTextFlags(rules.price)
+
     // Construct transformation
     
     const transformParts = [
@@ -671,17 +716,21 @@ function DesignPlayground() {
       `$origprice_$price_mul_1.25`, // Logic logic stays same
       `c_crop,w_1,h_1,g_north_west`, // Base crop
       `c_pad,w_${padW},h_${padH},b_$bgcolor`, // Canvas
-      `l_text:${titleFont}_${fontSizeTitle}_bold:$(title),co_rgb:${titleColor},fl_no_overflow`, // Title Layer
+      `l_text:${titleFont}_${fontSizeTitle}_bold:$(title),co_rgb:${titleColor}`, // Title Layer
       `fl_layer_apply,g_${titleGravity},x_${titleX},y_${titleY}`,
-      `l_text:${taglineFont}_${fontSizeTagline}_italic:$(tagline),co_rgb:${taglineColor},fl_no_overflow`, // Tagline Layer
+      ...titleFlags, // Title flags after fl_layer_apply
+      `l_text:${taglineFont}_${fontSizeTagline}_italic:$(tagline),co_rgb:${taglineColor}`, // Tagline Layer
       `fl_layer_apply,g_${taglineGravity},x_${taglineX},y_${taglineY}`,
+      ...taglineFlags, // Tagline flags after fl_layer_apply
       `l_$img`, // Image Layer
       `c_fit,w_${imgW},h_${imgH}`,
       `fl_layer_apply,g_${imgGravity},x_${imgX},y_${imgY}`,
-      `l_text:${origPriceFont}_${fontSizeOrigPrice}_strikethrough:%24$(origprice),co_rgb:${origPriceColor},fl_no_overflow`, // Orig Price Layer
+      `l_text:${origPriceFont}_${fontSizeOrigPrice}_strikethrough:%24$(origprice),co_rgb:${origPriceColor}`, // Orig Price Layer
       `fl_layer_apply,g_${origPriceGravity},x_${origPriceX},y_${origPriceY}`,
-      `l_text:${priceFont}_${fontSizePrice}_bold:%24$(price),co_rgb:${priceColor},fl_no_overflow`, // Price Layer
-      `fl_layer_apply,g_${priceGravity},x_${priceX},y_${priceY}`
+      ...origPriceFlags, // Orig Price flags after fl_layer_apply
+      `l_text:${priceFont}_${fontSizePrice}_bold:%24$(price),co_rgb:${priceColor}`, // Price Layer
+      `fl_layer_apply,g_${priceGravity},x_${priceX},y_${priceY}`,
+      ...priceFlags // Price flags after fl_layer_apply
     ]
 
     const transformString = transformParts.join('/')
@@ -812,6 +861,7 @@ function DesignPlayground() {
     if (key === 'color') return 'color'
     if (key === 'gravity') return 'gravity'
     if (key === 'font') return 'font'
+    if (key === 'flNoOverflow' || key === 'flTextDisallowOverflow') return 'boolean'
     if (key === 'width' || key === 'height' || key === 'x' || key === 'y' || key === 'fontSize') return 'number'
     return 'text'
   }
@@ -829,6 +879,61 @@ function DesignPlayground() {
     return GOOGLE_FONTS
   }
 
+  // Helper to check if a property is overridden (not inherited) for a child design
+  const isPropertyOverridden = (designId, layerKey, propertyKey) => {
+    if (designId === 'parent') return false // Parent doesn't inherit
+    return propertyOverrides[designId]?.[layerKey]?.[propertyKey] === true
+  }
+
+  // Helper to check if a property should be inherited based on type and toggles
+  const shouldInheritProperty = (propertyKey) => {
+    // Canvas dimensions (width, height) are NEVER inherited
+    if (propertyKey === 'width' || propertyKey === 'Height' || propertyKey === 'Width') {
+      return false
+    }
+    // Style properties (color, font, flags) are inherited if inheritStyles is ON
+    const styleProperties = ['color', 'font', 'flNoOverflow', 'flTextDisallowOverflow']
+    if (styleProperties.includes(propertyKey)) {
+      return inheritanceToggles.inheritStyles
+    }
+    // Position/size properties (x, y, fontSize, gravity) are inherited if inheritAll is ON
+    const positionSizeProperties = ['x', 'y', 'fontSize', 'gravity']
+    if (positionSizeProperties.includes(propertyKey)) {
+      return inheritanceToggles.inheritAll
+    }
+    return false
+  }
+
+  // Helper to propagate parent property change to children
+  const propagateToChildren = (layerKey, propertyKey, value, newRules) => {
+    if (selectedDesign.id !== 'parent') return newRules // Only propagate from parent
+    
+    const shouldInherit = shouldInheritProperty(propertyKey)
+    if (!shouldInherit) return newRules
+
+    // Get child design IDs
+    const childDesigns = DESIGN_TYPES.filter(d => d.id !== 'parent').map(d => d.id)
+    
+    childDesigns.forEach(childId => {
+      // Only propagate if child doesn't have an override
+      if (!isPropertyOverridden(childId, layerKey, propertyKey)) {
+        if (layerKey === '_general') {
+          // General properties (width, height) are at design level
+          if (newRules[childId]) {
+            newRules[childId][propertyKey] = value
+          }
+        } else {
+          // Layer properties
+          if (newRules[childId] && newRules[childId][layerKey]) {
+            newRules[childId][layerKey][propertyKey] = value
+          }
+        }
+      }
+    })
+    
+    return newRules
+  }
+
   // Handle rule value update
   const handleRuleUpdate = (category, layerName, key, value) => {
     setEditableRules(prev => {
@@ -843,6 +948,17 @@ function DesignPlayground() {
           if (newRules[designId]) {
             newRules[designId].width = widthValue
           }
+          // Mark as overridden if child (dimensions never inherit, so no propagation)
+          if (designId !== 'parent') {
+            setPropertyOverrides(prev => ({
+              ...prev,
+              [designId]: {
+                ...prev[designId],
+                _general: { ...prev[designId]?._general, width: true }
+              }
+            }))
+          }
+          // Dimensions are never inherited, so no propagation
         } else if (key === 'Height') {
           const heightValue = parseInt(value) || 0
           setCanvasDimensions(prev => ({ ...prev, height: heightValue }))
@@ -850,6 +966,17 @@ function DesignPlayground() {
           if (newRules[designId]) {
             newRules[designId].height = heightValue
           }
+          // Mark as overridden if child (dimensions never inherit, so no propagation)
+          if (designId !== 'parent') {
+            setPropertyOverrides(prev => ({
+              ...prev,
+              [designId]: {
+                ...prev[designId],
+                _general: { ...prev[designId]?._general, height: true }
+              }
+            }))
+          }
+          // Dimensions are never inherited, so no propagation
         } else if (key === 'Background Color') {
           setFormValues(prev => ({ ...prev, backgroundColor: value }))
         }
@@ -869,9 +996,141 @@ function DesignPlayground() {
           } else if (key === 'gravity' || key === 'font' || key === 'color') {
             // String values: gravity, font, color
             convertedValue = value
+          } else if (key === 'flNoOverflow' || key === 'flTextDisallowOverflow') {
+            // Boolean values: convert string to boolean
+            convertedValue = value === true || value === 'true' || value === '1'
           }
           
           newRules[designId][layerKey][key] = convertedValue
+          
+          // Mark as overridden if child, propagate if parent
+          if (designId !== 'parent') {
+            setPropertyOverrides(prev => ({
+              ...prev,
+              [designId]: {
+                ...prev[designId],
+                [layerKey]: { ...prev[designId]?.[layerKey], [key]: true }
+              }
+            }))
+          } else {
+            // Propagate to children
+            propagateToChildren(layerKey, key, convertedValue, newRules)
+          }
+        }
+      }
+      
+      return newRules
+    })
+  }
+
+  // Helper to get layer key from layer name
+  const getLayerKey = (layerName) => {
+    if (!layerName) return null
+    return layerName === 'Original Price' ? 'origPrice' : 
+           layerName === 'Title' ? 'title' :
+           layerName === 'Tagline' ? 'tagline' :
+           layerName === 'Price' ? 'price' : 
+           layerName === 'Image' ? 'image' : null
+  }
+
+  // Helper to check if a property is inherited (for display)
+  const isPropertyInherited = (category, layerName, key) => {
+    const designId = selectedDesign.id
+    if (designId === 'parent') return false // Parent doesn't inherit
+    
+    const layerKey = category === 'General' ? '_general' : getLayerKey(layerName)
+    if (!layerKey) return false
+    
+    // Normalize key for General properties (Width/Height -> width/height)
+    const normalizedKey = category === 'General' && (key === 'Width' || key === 'Height') 
+      ? key.toLowerCase() 
+      : key
+    
+    // Check if property is overridden
+    const isOverridden = isPropertyOverridden(designId, layerKey, normalizedKey)
+    if (isOverridden) return false
+    
+    // Check if property should be inherited
+    return shouldInheritProperty(normalizedKey)
+  }
+
+  // Helper to check if a property would be inherited (even if currently overridden)
+  const wouldPropertyBeInherited = (category, layerName, key) => {
+    const designId = selectedDesign.id
+    if (designId === 'parent') return false // Parent doesn't inherit
+    
+    const layerKey = category === 'General' ? '_general' : getLayerKey(layerName)
+    if (!layerKey) return false
+    
+    // Normalize key for General properties (Width/Height -> width/height)
+    const normalizedKey = category === 'General' && (key === 'Width' || key === 'Height') 
+      ? key.toLowerCase() 
+      : key
+    
+    // Check if property should be inherited (regardless of override status)
+    return shouldInheritProperty(normalizedKey)
+  }
+
+  // Helper to check if a property is overridden (for showing reset button)
+  const isPropertyOverriddenForDisplay = (category, layerName, key) => {
+    const designId = selectedDesign.id
+    if (designId === 'parent') return false // Parent doesn't have overrides
+    
+    const layerKey = category === 'General' ? '_general' : getLayerKey(layerName)
+    if (!layerKey) return false
+    
+    // Normalize key for General properties (Width/Height -> width/height)
+    const normalizedKey = category === 'General' && (key === 'Width' || key === 'Height') 
+      ? key.toLowerCase() 
+      : key
+    
+    return isPropertyOverridden(designId, layerKey, normalizedKey)
+  }
+
+  // Handle reset property to inherited state
+  const handleResetProperty = (category, layerName, key) => {
+    const designId = selectedDesign.id
+    if (designId === 'parent') return // Can't reset parent
+    
+    const layerKey = category === 'General' ? '_general' : getLayerKey(layerName)
+    
+    // Remove override
+    setPropertyOverrides(prev => {
+      const newOverrides = JSON.parse(JSON.stringify(prev))
+      if (newOverrides[designId]?.[layerKey]) {
+        delete newOverrides[designId][layerKey][key]
+        // Clean up empty objects
+        if (Object.keys(newOverrides[designId][layerKey]).length === 0) {
+          delete newOverrides[designId][layerKey]
+        }
+        if (Object.keys(newOverrides[designId]).length === 0) {
+          delete newOverrides[designId]
+        }
+      }
+      return newOverrides
+    })
+    
+    // Copy value from parent
+    setEditableRules(prev => {
+      const newRules = JSON.parse(JSON.stringify(prev))
+      
+      if (category === 'General') {
+        if (key === 'Width' || key === 'Height') {
+          const propKey = key.toLowerCase()
+          const parentValue = newRules['parent']?.[propKey] || 0
+          if (newRules[designId]) {
+            newRules[designId][propKey] = parentValue
+          }
+          if (key === 'Width') {
+            setCanvasDimensions(prev => ({ ...prev, width: parentValue }))
+          } else {
+            setCanvasDimensions(prev => ({ ...prev, height: parentValue }))
+          }
+        }
+      } else if (category === 'Layers' && layerName && layerKey) {
+        const parentValue = newRules['parent']?.[layerKey]?.[key]
+        if (parentValue !== undefined && newRules[designId]?.[layerKey]) {
+          newRules[designId][layerKey][key] = parentValue
         }
       }
       
@@ -1129,18 +1388,46 @@ function DesignPlayground() {
               return (
                 <div key={design.id}>
                   <div 
-                    className={`design-option parent ${isSelected ? 'active' : ''}`}
+                    className={`design-option parent ${isSelected ? 'active' : ''} ${isParentHovered ? 'hovered' : ''}`}
                     onClick={() => setSelectedDesign(design)}
+                    onMouseEnter={() => setIsParentHovered(true)}
+                    onMouseLeave={() => setIsParentHovered(false)}
                   >
-                    <div className="design-name">{design.name}</div>
-                    <div className="design-dims">{displayWidth} x {displayHeight}</div>
-                    <div className="design-icon-wrapper">
-                      <svg className="design-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                        <line x1="9" y1="3" x2="9" y2="21"></line>
-                        <line x1="3" y1="9" x2="21" y2="9"></line>
-                      </svg>
+                    <div className="design-card-content">
+                      <div className="design-name">{design.name}</div>
+                      <div className="design-dims">{displayWidth} x {displayHeight}</div>
+                      <div className="design-icon-wrapper">
+                        <svg className="design-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                          <line x1="9" y1="3" x2="9" y2="21"></line>
+                          <line x1="3" y1="9" x2="21" y2="9"></line>
+                        </svg>
+                      </div>
                     </div>
+                    {/* Inheritance toggles - shown on hover, inside card */}
+                    {isParentHovered && (
+                      <div className="inheritance-toggles" onMouseEnter={() => setIsParentHovered(true)}>
+                        <div className="inheritance-toggle-item">
+                          <label>Inherit Styles</label>
+                          <div className="toggle-wrapper" onClick={(e) => e.stopPropagation()}>
+                            <div className={`toggle-track active`} style={{ opacity: 0.5, cursor: 'not-allowed' }}>
+                              <div className="toggle-thumb"></div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="inheritance-toggle-item">
+                          <label>Inherit All</label>
+                          <div className="toggle-wrapper" onClick={(e) => {
+                            e.stopPropagation()
+                            setInheritanceToggles(prev => ({ ...prev, inheritAll: !prev.inheritAll }))
+                          }}>
+                            <div className={`toggle-track ${inheritanceToggles.inheritAll ? 'active' : ''}`}>
+                              <div className="toggle-thumb"></div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   {/* Tree connector line */}
                   <div className="tree-connector">
@@ -1284,28 +1571,138 @@ function DesignPlayground() {
                   </tr>
                   <tr data-row-key="canvas-dimensions">
                     <td>General</td>
-                    <td>Width</td>
                     <td>
-                      <input
-                        type="number"
-                        value={canvasDimensions.width}
-                        onChange={(e) => handleRuleUpdate('General', null, 'Width', e.target.value)}
-                        className="rule-input rule-input-number"
-                        min="1"
-                      />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        Width
+                        {(() => {
+                          const isInherited = isPropertyInherited('General', null, 'Width')
+                          const isOverridden = isPropertyOverriddenForDisplay('General', null, 'Width')
+                          const wouldBeInherited = wouldPropertyBeInherited('General', null, 'Width')
+                          const showIcon = isInherited || (isOverridden && wouldBeInherited)
+                          return showIcon ? (
+                            <svg 
+                              width="14" 
+                              height="14" 
+                              viewBox="0 0 24 24" 
+                              fill="none" 
+                              stroke={isInherited ? "var(--active-color)" : "#888"} 
+                              strokeWidth="2" 
+                              style={{ opacity: isInherited ? 0.7 : 0.4 }} 
+                              title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
+                            >
+                              <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                              <path d="M2 17l10 5 10-5"></path>
+                              <path d="M2 12l10 5 10-5"></path>
+                            </svg>
+                          ) : null
+                        })()}
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <input
+                          type="number"
+                          value={canvasDimensions.width}
+                          onChange={(e) => handleRuleUpdate('General', null, 'Width', e.target.value)}
+                          className="rule-input rule-input-number"
+                          min="1"
+                        />
+                        {isPropertyOverriddenForDisplay('General', null, 'Width') && (
+                          <button
+                            className="reset-property-btn"
+                            onClick={() => handleResetProperty('General', null, 'Width')}
+                            title="Reset to inherited value"
+                            style={{
+                              padding: '0.25rem 0.5rem',
+                              fontSize: '0.75rem',
+                              backgroundColor: 'transparent',
+                              border: '1px solid #555',
+                              borderRadius: '4px',
+                              color: '#aaa',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.target.style.borderColor = 'var(--active-color)'
+                              e.target.style.color = 'var(--active-color)'
+                            }}
+                            onMouseLeave={(e) => {
+                              e.target.style.borderColor = '#555'
+                              e.target.style.color = '#aaa'
+                            }}
+                          >
+                            Reset
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                   <tr data-row-key="canvas-dimensions">
                     <td>General</td>
-                    <td>Height</td>
                     <td>
-                      <input
-                        type="number"
-                        value={canvasDimensions.height}
-                        onChange={(e) => handleRuleUpdate('General', null, 'Height', e.target.value)}
-                        className="rule-input rule-input-number"
-                        min="1"
-                      />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        Height
+                        {(() => {
+                          const isInherited = isPropertyInherited('General', null, 'Height')
+                          const isOverridden = isPropertyOverriddenForDisplay('General', null, 'Height')
+                          const wouldBeInherited = wouldPropertyBeInherited('General', null, 'Height')
+                          const showIcon = isInherited || (isOverridden && wouldBeInherited)
+                          return showIcon ? (
+                            <svg 
+                              width="14" 
+                              height="14" 
+                              viewBox="0 0 24 24" 
+                              fill="none" 
+                              stroke={isInherited ? "var(--active-color)" : "#888"} 
+                              strokeWidth="2" 
+                              style={{ opacity: isInherited ? 0.7 : 0.4 }} 
+                              title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
+                            >
+                              <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                              <path d="M2 17l10 5 10-5"></path>
+                              <path d="M2 12l10 5 10-5"></path>
+                            </svg>
+                          ) : null
+                        })()}
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <input
+                          type="number"
+                          value={canvasDimensions.height}
+                          onChange={(e) => handleRuleUpdate('General', null, 'Height', e.target.value)}
+                          className="rule-input rule-input-number"
+                          min="1"
+                        />
+                        {isPropertyOverriddenForDisplay('General', null, 'Height') && (
+                          <button
+                            className="reset-property-btn"
+                            onClick={() => handleResetProperty('General', null, 'Height')}
+                            title="Reset to inherited value"
+                            style={{
+                              padding: '0.25rem 0.5rem',
+                              fontSize: '0.75rem',
+                              backgroundColor: 'transparent',
+                              border: '1px solid #555',
+                              borderRadius: '4px',
+                              color: '#aaa',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.target.style.borderColor = 'var(--active-color)'
+                              e.target.style.color = 'var(--active-color)'
+                            }}
+                            onMouseLeave={(e) => {
+                              e.target.style.borderColor = '#555'
+                              e.target.style.color = '#aaa'
+                            }}
+                          >
+                            Reset
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                   <tr data-row-key="background-color">
@@ -1404,6 +1801,14 @@ function DesignPlayground() {
                               step={key === 'fontSize' ? '0.1' : '1'}
                             />
                           )
+                        } else if (fieldType === 'boolean') {
+                          inputElement = (
+                            <div className="toggle-wrapper" onClick={() => handleRuleUpdate('Layers', layer.name, key, !currentValue)}>
+                              <div className={`toggle-track ${currentValue ? 'active' : ''}`}>
+                                <div className="toggle-thumb"></div>
+                              </div>
+                            </div>
+                          )
                         } else {
                           inputElement = (
                             <input
@@ -1415,11 +1820,67 @@ function DesignPlayground() {
                           )
                         }
                         
+                        const isInherited = isPropertyInherited('Layers', layer.name, key)
+                        const isOverridden = isPropertyOverriddenForDisplay('Layers', layer.name, key)
+                        const wouldBeInherited = wouldPropertyBeInherited('Layers', layer.name, key)
+                        const showIcon = isInherited || (isOverridden && wouldBeInherited)
+                        
                         rows.push(
                           <tr key={`${layer.name}-${key}`} data-row-key={rowKey}>
                             <td></td>
-                            <td>{key}</td>
-                            <td>{inputElement}</td>
+                            <td>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                {key}
+                                {showIcon && (
+                                  <svg 
+                                    width="14" 
+                                    height="14" 
+                                    viewBox="0 0 24 24" 
+                                    fill="none" 
+                                    stroke={isInherited ? "var(--active-color)" : "#888"} 
+                                    strokeWidth="2" 
+                                    style={{ opacity: isInherited ? 0.7 : 0.4 }} 
+                                    title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
+                                  >
+                                    <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                                    <path d="M2 17l10 5 10-5"></path>
+                                    <path d="M2 12l10 5 10-5"></path>
+                                  </svg>
+                                )}
+                              </div>
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                {inputElement}
+                                {isOverridden && (
+                                  <button
+                                    className="reset-property-btn"
+                                    onClick={() => handleResetProperty('Layers', layer.name, key)}
+                                    title="Reset to inherited value"
+                                    style={{
+                                      padding: '0.25rem 0.5rem',
+                                      fontSize: '0.75rem',
+                                      backgroundColor: 'transparent',
+                                      border: '1px solid #555',
+                                      borderRadius: '4px',
+                                      color: '#aaa',
+                                      cursor: 'pointer',
+                                      transition: 'all 0.2s'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      e.target.style.borderColor = 'var(--active-color)'
+                                      e.target.style.color = 'var(--active-color)'
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.target.style.borderColor = '#555'
+                                      e.target.style.color = '#aaa'
+                                    }}
+                                  >
+                                    Reset
+                                  </button>
+                                )}
+                              </div>
+                            </td>
                           </tr>
                         )
                       })
@@ -1587,17 +2048,137 @@ function DesignPlayground() {
               <div className="control-group">
                 <div className="label-row">
                   <label>Font</label>
+                  {(() => {
+                    const isInherited = isPropertyInherited('Layers', 'Title', 'font')
+                    const isOverridden = isPropertyOverriddenForDisplay('Layers', 'Title', 'font')
+                    const wouldBeInherited = wouldPropertyBeInherited('Layers', 'Title', 'font')
+                    const showIcon = isInherited || (isOverridden && wouldBeInherited)
+                    return showIcon ? (
+                      <svg 
+                        width="14" 
+                        height="14" 
+                        viewBox="0 0 24 24" 
+                        fill="none" 
+                        stroke={isInherited ? "var(--active-color)" : "#888"} 
+                        strokeWidth="2" 
+                        style={{ opacity: isInherited ? 0.7 : 0.4 }} 
+                        title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
+                      >
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                        <path d="M2 17l10 5 10-5"></path>
+                        <path d="M2 12l10 5 10-5"></path>
+                      </svg>
+                    ) : null
+                  })()}
                 </div>
-                <select 
-                  value={editableRules[selectedDesign.id]?.title?.font || 'Arial'}
-                  onChange={(e) => handleRuleUpdate('Layers', 'Title', 'font', e.target.value)}
-                >
-                  {GOOGLE_FONTS.map(font => (
-                    <option key={font.value} value={font.value}>
-                      {font.name}
-                    </option>
-                  ))}
-                </select>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <select 
+                    value={editableRules[selectedDesign.id]?.title?.font || 'Arial'}
+                    onChange={(e) => handleRuleUpdate('Layers', 'Title', 'font', e.target.value)}
+                    style={{ flex: 1 }}
+                  >
+                    {GOOGLE_FONTS.map(font => (
+                      <option key={font.value} value={font.value}>
+                        {font.name}
+                      </option>
+                    ))}
+                  </select>
+                  {isPropertyOverriddenForDisplay('Layers', 'Title', 'font') && (
+                    <button
+                      className="reset-property-btn"
+                      onClick={() => handleResetProperty('Layers', 'Title', 'font')}
+                      title="Reset to inherited value"
+                      style={{
+                        padding: '0.25rem 0.5rem',
+                        fontSize: '0.75rem',
+                        backgroundColor: 'transparent',
+                        border: '1px solid #555',
+                        borderRadius: '4px',
+                        color: '#aaa',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        whiteSpace: 'nowrap'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.borderColor = 'var(--active-color)'
+                        e.target.style.color = 'var(--active-color)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.borderColor = '#555'
+                        e.target.style.color = '#aaa'
+                      }}
+                    >
+                      Reset
+                    </button>
+                  )}
+                </div>
+              </div>
+              
+              {/* Text Flags */}
+              <div className="control-group">
+                <div className="label-row">
+                  <label>No Overflow</label>
+                  {(() => {
+                    const isInherited = isPropertyInherited('Layers', 'Title', 'flNoOverflow')
+                    const isOverridden = isPropertyOverriddenForDisplay('Layers', 'Title', 'flNoOverflow')
+                    const wouldBeInherited = wouldPropertyBeInherited('Layers', 'Title', 'flNoOverflow')
+                    const showIcon = isInherited || (isOverridden && wouldBeInherited)
+                    return showIcon ? (
+                      <svg 
+                        width="14" 
+                        height="14" 
+                        viewBox="0 0 24 24" 
+                        fill="none" 
+                        stroke={isInherited ? "var(--active-color)" : "#888"} 
+                        strokeWidth="2" 
+                        style={{ opacity: isInherited ? 0.7 : 0.4 }} 
+                        title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
+                      >
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                        <path d="M2 17l10 5 10-5"></path>
+                        <path d="M2 12l10 5 10-5"></path>
+                      </svg>
+                    ) : null
+                  })()}
+                </div>
+                <div className="toggle-wrapper" onClick={() => handleRuleUpdate('Layers', 'Title', 'flNoOverflow', !(editableRules[selectedDesign.id]?.title?.flNoOverflow || false))}>
+                  <div className={`toggle-track ${editableRules[selectedDesign.id]?.title?.flNoOverflow ? 'active' : ''}`}>
+                    <div className="toggle-thumb"></div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="control-group">
+                <div className="label-row">
+                  <label>Disallow Overflow</label>
+                  {(() => {
+                    const isInherited = isPropertyInherited('Layers', 'Title', 'flTextDisallowOverflow')
+                    const isOverridden = isPropertyOverriddenForDisplay('Layers', 'Title', 'flTextDisallowOverflow')
+                    const wouldBeInherited = wouldPropertyBeInherited('Layers', 'Title', 'flTextDisallowOverflow')
+                    const showIcon = isInherited || (isOverridden && wouldBeInherited)
+                    return showIcon ? (
+                      <svg 
+                        width="14" 
+                        height="14" 
+                        viewBox="0 0 24 24" 
+                        fill="none" 
+                        stroke={isInherited ? "var(--active-color)" : "#888"} 
+                        strokeWidth="2" 
+                        style={{ opacity: isInherited ? 0.7 : 0.4 }} 
+                        title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
+                      >
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                        <path d="M2 17l10 5 10-5"></path>
+                        <path d="M2 12l10 5 10-5"></path>
+                      </svg>
+                    ) : null
+                  })()}
+                </div>
+                <div className="toggle-wrapper" onClick={() => handleRuleUpdate('Layers', 'Title', 'flTextDisallowOverflow', !(editableRules[selectedDesign.id]?.title?.flTextDisallowOverflow || false))}>
+                  <div className={`toggle-track ${editableRules[selectedDesign.id]?.title?.flTextDisallowOverflow ? 'active' : ''}`}>
+                    <div className="toggle-thumb"></div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -1607,17 +2188,137 @@ function DesignPlayground() {
               <div className="control-group">
                 <div className="label-row">
                   <label>Font</label>
+                  {(() => {
+                    const isInherited = isPropertyInherited('Layers', 'Tagline', 'font')
+                    const isOverridden = isPropertyOverriddenForDisplay('Layers', 'Tagline', 'font')
+                    const wouldBeInherited = wouldPropertyBeInherited('Layers', 'Tagline', 'font')
+                    const showIcon = isInherited || (isOverridden && wouldBeInherited)
+                    return showIcon ? (
+                      <svg 
+                        width="14" 
+                        height="14" 
+                        viewBox="0 0 24 24" 
+                        fill="none" 
+                        stroke={isInherited ? "var(--active-color)" : "#888"} 
+                        strokeWidth="2" 
+                        style={{ opacity: isInherited ? 0.7 : 0.4 }} 
+                        title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
+                      >
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                        <path d="M2 17l10 5 10-5"></path>
+                        <path d="M2 12l10 5 10-5"></path>
+                      </svg>
+                    ) : null
+                  })()}
                 </div>
-                <select 
-                  value={editableRules[selectedDesign.id]?.tagline?.font || 'Arial'}
-                  onChange={(e) => handleRuleUpdate('Layers', 'Tagline', 'font', e.target.value)}
-                >
-                  {GOOGLE_FONTS.map(font => (
-                    <option key={font.value} value={font.value}>
-                      {font.name}
-                    </option>
-                  ))}
-                </select>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <select 
+                    value={editableRules[selectedDesign.id]?.tagline?.font || 'Arial'}
+                    onChange={(e) => handleRuleUpdate('Layers', 'Tagline', 'font', e.target.value)}
+                    style={{ flex: 1 }}
+                  >
+                    {GOOGLE_FONTS.map(font => (
+                      <option key={font.value} value={font.value}>
+                        {font.name}
+                      </option>
+                    ))}
+                  </select>
+                  {isPropertyOverriddenForDisplay('Layers', 'Tagline', 'font') && (
+                    <button
+                      className="reset-property-btn"
+                      onClick={() => handleResetProperty('Layers', 'Tagline', 'font')}
+                      title="Reset to inherited value"
+                      style={{
+                        padding: '0.25rem 0.5rem',
+                        fontSize: '0.75rem',
+                        backgroundColor: 'transparent',
+                        border: '1px solid #555',
+                        borderRadius: '4px',
+                        color: '#aaa',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        whiteSpace: 'nowrap'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.borderColor = 'var(--active-color)'
+                        e.target.style.color = 'var(--active-color)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.borderColor = '#555'
+                        e.target.style.color = '#aaa'
+                      }}
+                    >
+                      Reset
+                    </button>
+                  )}
+                </div>
+              </div>
+              
+              {/* Text Flags */}
+              <div className="control-group">
+                <div className="label-row">
+                  <label>No Overflow</label>
+                  {(() => {
+                    const isInherited = isPropertyInherited('Layers', 'Tagline', 'flNoOverflow')
+                    const isOverridden = isPropertyOverriddenForDisplay('Layers', 'Tagline', 'flNoOverflow')
+                    const wouldBeInherited = wouldPropertyBeInherited('Layers', 'Tagline', 'flNoOverflow')
+                    const showIcon = isInherited || (isOverridden && wouldBeInherited)
+                    return showIcon ? (
+                      <svg 
+                        width="14" 
+                        height="14" 
+                        viewBox="0 0 24 24" 
+                        fill="none" 
+                        stroke={isInherited ? "var(--active-color)" : "#888"} 
+                        strokeWidth="2" 
+                        style={{ opacity: isInherited ? 0.7 : 0.4 }} 
+                        title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
+                      >
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                        <path d="M2 17l10 5 10-5"></path>
+                        <path d="M2 12l10 5 10-5"></path>
+                      </svg>
+                    ) : null
+                  })()}
+                </div>
+                <div className="toggle-wrapper" onClick={() => handleRuleUpdate('Layers', 'Tagline', 'flNoOverflow', !(editableRules[selectedDesign.id]?.tagline?.flNoOverflow || false))}>
+                  <div className={`toggle-track ${editableRules[selectedDesign.id]?.tagline?.flNoOverflow ? 'active' : ''}`}>
+                    <div className="toggle-thumb"></div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="control-group">
+                <div className="label-row">
+                  <label>Disallow Overflow</label>
+                  {(() => {
+                    const isInherited = isPropertyInherited('Layers', 'Tagline', 'flTextDisallowOverflow')
+                    const isOverridden = isPropertyOverriddenForDisplay('Layers', 'Tagline', 'flTextDisallowOverflow')
+                    const wouldBeInherited = wouldPropertyBeInherited('Layers', 'Tagline', 'flTextDisallowOverflow')
+                    const showIcon = isInherited || (isOverridden && wouldBeInherited)
+                    return showIcon ? (
+                      <svg 
+                        width="14" 
+                        height="14" 
+                        viewBox="0 0 24 24" 
+                        fill="none" 
+                        stroke={isInherited ? "var(--active-color)" : "#888"} 
+                        strokeWidth="2" 
+                        style={{ opacity: isInherited ? 0.7 : 0.4 }} 
+                        title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
+                      >
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                        <path d="M2 17l10 5 10-5"></path>
+                        <path d="M2 12l10 5 10-5"></path>
+                      </svg>
+                    ) : null
+                  })()}
+                </div>
+                <div className="toggle-wrapper" onClick={() => handleRuleUpdate('Layers', 'Tagline', 'flTextDisallowOverflow', !(editableRules[selectedDesign.id]?.tagline?.flTextDisallowOverflow || false))}>
+                  <div className={`toggle-track ${editableRules[selectedDesign.id]?.tagline?.flTextDisallowOverflow ? 'active' : ''}`}>
+                    <div className="toggle-thumb"></div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -1627,17 +2328,137 @@ function DesignPlayground() {
               <div className="control-group">
                 <div className="label-row">
                   <label>Font</label>
+                  {(() => {
+                    const isInherited = isPropertyInherited('Layers', 'Price', 'font')
+                    const isOverridden = isPropertyOverriddenForDisplay('Layers', 'Price', 'font')
+                    const wouldBeInherited = wouldPropertyBeInherited('Layers', 'Price', 'font')
+                    const showIcon = isInherited || (isOverridden && wouldBeInherited)
+                    return showIcon ? (
+                      <svg 
+                        width="14" 
+                        height="14" 
+                        viewBox="0 0 24 24" 
+                        fill="none" 
+                        stroke={isInherited ? "var(--active-color)" : "#888"} 
+                        strokeWidth="2" 
+                        style={{ opacity: isInherited ? 0.7 : 0.4 }} 
+                        title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
+                      >
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                        <path d="M2 17l10 5 10-5"></path>
+                        <path d="M2 12l10 5 10-5"></path>
+                      </svg>
+                    ) : null
+                  })()}
                 </div>
-                <select 
-                  value={editableRules[selectedDesign.id]?.price?.font || 'Arial'}
-                  onChange={(e) => handleRuleUpdate('Layers', 'Price', 'font', e.target.value)}
-                >
-                  {GOOGLE_FONTS.map(font => (
-                    <option key={font.value} value={font.value}>
-                      {font.name}
-                    </option>
-                  ))}
-                </select>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <select 
+                    value={editableRules[selectedDesign.id]?.price?.font || 'Arial'}
+                    onChange={(e) => handleRuleUpdate('Layers', 'Price', 'font', e.target.value)}
+                    style={{ flex: 1 }}
+                  >
+                    {GOOGLE_FONTS.map(font => (
+                      <option key={font.value} value={font.value}>
+                        {font.name}
+                      </option>
+                    ))}
+                  </select>
+                  {isPropertyOverriddenForDisplay('Layers', 'Price', 'font') && (
+                    <button
+                      className="reset-property-btn"
+                      onClick={() => handleResetProperty('Layers', 'Price', 'font')}
+                      title="Reset to inherited value"
+                      style={{
+                        padding: '0.25rem 0.5rem',
+                        fontSize: '0.75rem',
+                        backgroundColor: 'transparent',
+                        border: '1px solid #555',
+                        borderRadius: '4px',
+                        color: '#aaa',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        whiteSpace: 'nowrap'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.borderColor = 'var(--active-color)'
+                        e.target.style.color = 'var(--active-color)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.borderColor = '#555'
+                        e.target.style.color = '#aaa'
+                      }}
+                    >
+                      Reset
+                    </button>
+                  )}
+                </div>
+              </div>
+              
+              {/* Text Flags */}
+              <div className="control-group">
+                <div className="label-row">
+                  <label>No Overflow</label>
+                  {(() => {
+                    const isInherited = isPropertyInherited('Layers', 'Price', 'flNoOverflow')
+                    const isOverridden = isPropertyOverriddenForDisplay('Layers', 'Price', 'flNoOverflow')
+                    const wouldBeInherited = wouldPropertyBeInherited('Layers', 'Price', 'flNoOverflow')
+                    const showIcon = isInherited || (isOverridden && wouldBeInherited)
+                    return showIcon ? (
+                      <svg 
+                        width="14" 
+                        height="14" 
+                        viewBox="0 0 24 24" 
+                        fill="none" 
+                        stroke={isInherited ? "var(--active-color)" : "#888"} 
+                        strokeWidth="2" 
+                        style={{ opacity: isInherited ? 0.7 : 0.4 }} 
+                        title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
+                      >
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                        <path d="M2 17l10 5 10-5"></path>
+                        <path d="M2 12l10 5 10-5"></path>
+                      </svg>
+                    ) : null
+                  })()}
+                </div>
+                <div className="toggle-wrapper" onClick={() => handleRuleUpdate('Layers', 'Price', 'flNoOverflow', !(editableRules[selectedDesign.id]?.price?.flNoOverflow || false))}>
+                  <div className={`toggle-track ${editableRules[selectedDesign.id]?.price?.flNoOverflow ? 'active' : ''}`}>
+                    <div className="toggle-thumb"></div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="control-group">
+                <div className="label-row">
+                  <label>Disallow Overflow</label>
+                  {(() => {
+                    const isInherited = isPropertyInherited('Layers', 'Price', 'flTextDisallowOverflow')
+                    const isOverridden = isPropertyOverriddenForDisplay('Layers', 'Price', 'flTextDisallowOverflow')
+                    const wouldBeInherited = wouldPropertyBeInherited('Layers', 'Price', 'flTextDisallowOverflow')
+                    const showIcon = isInherited || (isOverridden && wouldBeInherited)
+                    return showIcon ? (
+                      <svg 
+                        width="14" 
+                        height="14" 
+                        viewBox="0 0 24 24" 
+                        fill="none" 
+                        stroke={isInherited ? "var(--active-color)" : "#888"} 
+                        strokeWidth="2" 
+                        style={{ opacity: isInherited ? 0.7 : 0.4 }} 
+                        title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
+                      >
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                        <path d="M2 17l10 5 10-5"></path>
+                        <path d="M2 12l10 5 10-5"></path>
+                      </svg>
+                    ) : null
+                  })()}
+                </div>
+                <div className="toggle-wrapper" onClick={() => handleRuleUpdate('Layers', 'Price', 'flTextDisallowOverflow', !(editableRules[selectedDesign.id]?.price?.flTextDisallowOverflow || false))}>
+                  <div className={`toggle-track ${editableRules[selectedDesign.id]?.price?.flTextDisallowOverflow ? 'active' : ''}`}>
+                    <div className="toggle-thumb"></div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -1647,17 +2468,137 @@ function DesignPlayground() {
               <div className="control-group">
                 <div className="label-row">
                   <label>Font</label>
+                  {(() => {
+                    const isInherited = isPropertyInherited('Layers', 'Original Price', 'font')
+                    const isOverridden = isPropertyOverriddenForDisplay('Layers', 'Original Price', 'font')
+                    const wouldBeInherited = wouldPropertyBeInherited('Layers', 'Original Price', 'font')
+                    const showIcon = isInherited || (isOverridden && wouldBeInherited)
+                    return showIcon ? (
+                      <svg 
+                        width="14" 
+                        height="14" 
+                        viewBox="0 0 24 24" 
+                        fill="none" 
+                        stroke={isInherited ? "var(--active-color)" : "#888"} 
+                        strokeWidth="2" 
+                        style={{ opacity: isInherited ? 0.7 : 0.4 }} 
+                        title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
+                      >
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                        <path d="M2 17l10 5 10-5"></path>
+                        <path d="M2 12l10 5 10-5"></path>
+                      </svg>
+                    ) : null
+                  })()}
                 </div>
-                <select 
-                  value={editableRules[selectedDesign.id]?.origPrice?.font || 'Arial'}
-                  onChange={(e) => handleRuleUpdate('Layers', 'Original Price', 'font', e.target.value)}
-                >
-                  {GOOGLE_FONTS.map(font => (
-                    <option key={font.value} value={font.value}>
-                      {font.name}
-                    </option>
-                  ))}
-                </select>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <select 
+                    value={editableRules[selectedDesign.id]?.origPrice?.font || 'Arial'}
+                    onChange={(e) => handleRuleUpdate('Layers', 'Original Price', 'font', e.target.value)}
+                    style={{ flex: 1 }}
+                  >
+                    {GOOGLE_FONTS.map(font => (
+                      <option key={font.value} value={font.value}>
+                        {font.name}
+                      </option>
+                    ))}
+                  </select>
+                  {isPropertyOverriddenForDisplay('Layers', 'Original Price', 'font') && (
+                    <button
+                      className="reset-property-btn"
+                      onClick={() => handleResetProperty('Layers', 'Original Price', 'font')}
+                      title="Reset to inherited value"
+                      style={{
+                        padding: '0.25rem 0.5rem',
+                        fontSize: '0.75rem',
+                        backgroundColor: 'transparent',
+                        border: '1px solid #555',
+                        borderRadius: '4px',
+                        color: '#aaa',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        whiteSpace: 'nowrap'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.borderColor = 'var(--active-color)'
+                        e.target.style.color = 'var(--active-color)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.borderColor = '#555'
+                        e.target.style.color = '#aaa'
+                      }}
+                    >
+                      Reset
+                    </button>
+                  )}
+                </div>
+              </div>
+              
+              {/* Text Flags */}
+              <div className="control-group">
+                <div className="label-row">
+                  <label>No Overflow</label>
+                  {(() => {
+                    const isInherited = isPropertyInherited('Layers', 'Original Price', 'flNoOverflow')
+                    const isOverridden = isPropertyOverriddenForDisplay('Layers', 'Original Price', 'flNoOverflow')
+                    const wouldBeInherited = wouldPropertyBeInherited('Layers', 'Original Price', 'flNoOverflow')
+                    const showIcon = isInherited || (isOverridden && wouldBeInherited)
+                    return showIcon ? (
+                      <svg 
+                        width="14" 
+                        height="14" 
+                        viewBox="0 0 24 24" 
+                        fill="none" 
+                        stroke={isInherited ? "var(--active-color)" : "#888"} 
+                        strokeWidth="2" 
+                        style={{ opacity: isInherited ? 0.7 : 0.4 }} 
+                        title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
+                      >
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                        <path d="M2 17l10 5 10-5"></path>
+                        <path d="M2 12l10 5 10-5"></path>
+                      </svg>
+                    ) : null
+                  })()}
+                </div>
+                <div className="toggle-wrapper" onClick={() => handleRuleUpdate('Layers', 'Original Price', 'flNoOverflow', !(editableRules[selectedDesign.id]?.origPrice?.flNoOverflow || false))}>
+                  <div className={`toggle-track ${editableRules[selectedDesign.id]?.origPrice?.flNoOverflow ? 'active' : ''}`}>
+                    <div className="toggle-thumb"></div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="control-group">
+                <div className="label-row">
+                  <label>Disallow Overflow</label>
+                  {(() => {
+                    const isInherited = isPropertyInherited('Layers', 'Original Price', 'flTextDisallowOverflow')
+                    const isOverridden = isPropertyOverriddenForDisplay('Layers', 'Original Price', 'flTextDisallowOverflow')
+                    const wouldBeInherited = wouldPropertyBeInherited('Layers', 'Original Price', 'flTextDisallowOverflow')
+                    const showIcon = isInherited || (isOverridden && wouldBeInherited)
+                    return showIcon ? (
+                      <svg 
+                        width="14" 
+                        height="14" 
+                        viewBox="0 0 24 24" 
+                        fill="none" 
+                        stroke={isInherited ? "var(--active-color)" : "#888"} 
+                        strokeWidth="2" 
+                        style={{ opacity: isInherited ? 0.7 : 0.4 }} 
+                        title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
+                      >
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                        <path d="M2 17l10 5 10-5"></path>
+                        <path d="M2 12l10 5 10-5"></path>
+                      </svg>
+                    ) : null
+                  })()}
+                </div>
+                <div className="toggle-wrapper" onClick={() => handleRuleUpdate('Layers', 'Original Price', 'flTextDisallowOverflow', !(editableRules[selectedDesign.id]?.origPrice?.flTextDisallowOverflow || false))}>
+                  <div className={`toggle-track ${editableRules[selectedDesign.id]?.origPrice?.flTextDisallowOverflow ? 'active' : ''}`}>
+                    <div className="toggle-thumb"></div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
