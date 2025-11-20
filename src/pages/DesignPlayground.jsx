@@ -61,8 +61,24 @@ const GRAVITY_VALUES = {
   center: 'center'
 }
 
-
-
+// Google Fonts list - 15 popular fonts
+const GOOGLE_FONTS = [
+  { name: 'Roboto', value: 'Roboto' },
+  { name: 'Open Sans', value: 'Open Sans' },
+  { name: 'Lato', value: 'Lato' },
+  { name: 'Montserrat', value: 'Montserrat' },
+  { name: 'Oswald', value: 'Oswald' },
+  { name: 'Raleway', value: 'Raleway' },
+  { name: 'Poppins', value: 'Poppins' },
+  { name: 'Source Sans Pro', value: 'Source Sans Pro' },
+  { name: 'Playfair Display', value: 'Playfair Display' },
+  { name: 'Merriweather', value: 'Merriweather' },
+  { name: 'Ubuntu', value: 'Ubuntu' },
+  { name: 'Nunito', value: 'Nunito' },
+  { name: 'Dancing Script', value: 'Dancing Script' },
+  { name: 'Bebas Neue', value: 'Bebas Neue' },
+  { name: 'Arial', value: 'Arial' } // Keep Arial as default/fallback
+]
 
 const LIGHT_BLUE = '#03a9f4'
 
@@ -73,29 +89,29 @@ const DESIGN_RULES = {
   'parent': {
     width: 500,
     height: 900,
-    title: { x: 30, y: 40, gravity: GRAVITY_VALUES.northWest, fontSize: 32, color: '#ffffff' },
-    tagline: { x: 30, y: 120, gravity: GRAVITY_VALUES.northEast, fontSize: 20, color: '#ffffff' },
+    title: { x: 30, y: 40, gravity: GRAVITY_VALUES.northWest, fontSize: 32, color: '#ffffff', font: 'Arial' },
+    tagline: { x: 30, y: 120, gravity: GRAVITY_VALUES.northEast, fontSize: 20, color: '#ffffff', font: 'Arial' },
     image: { width: 300, height: 300, x: 10, y: 30, gravity: GRAVITY_VALUES.southEast },
-    origPrice: { x: 30, y: 40, gravity: GRAVITY_VALUES.southWest, fontSize: 30, color: '#bbbbbb' },
-    price: { x: 130, y: 40, gravity: GRAVITY_VALUES.southWest, fontSize: 44, color: '#ffffff' }
+    origPrice: { x: 30, y: 40, gravity: GRAVITY_VALUES.southWest, fontSize: 30, color: '#bbbbbb', font: 'Arial' },
+    price: { x: 130, y: 40, gravity: GRAVITY_VALUES.southWest, fontSize: 44, color: '#ffffff', font: 'Arial' }
   },
   'ig-ad': {
     width: 1080,
     height: 1080,
-    title: { x: 0, y: 65, gravity: GRAVITY_VALUES.north, fontSize: 32, color: '#ffffff' },
-    tagline: { x: 0, y: 100, gravity: GRAVITY_VALUES.north, fontSize: 20, color: '#ffffff' },
+    title: { x: 0, y: 65, gravity: GRAVITY_VALUES.north, fontSize: 32, color: '#ffffff', font: 'Arial' },
+    tagline: { x: 0, y: 100, gravity: GRAVITY_VALUES.north, fontSize: 20, color: '#ffffff', font: 'Arial' },
     image: { width: 350, height: 250, x: 0, y: 120, gravity: GRAVITY_VALUES.north },
-    origPrice: { x: -50, y: 60, gravity: GRAVITY_VALUES.south, fontSize: 30, color: '#bbbbbb' },
-    price: { x: 50, y: 50, gravity: GRAVITY_VALUES.south, fontSize: 44, color: '#ffffff' }
+    origPrice: { x: -50, y: 60, gravity: GRAVITY_VALUES.south, fontSize: 30, color: '#bbbbbb', font: 'Arial' },
+    price: { x: 50, y: 50, gravity: GRAVITY_VALUES.south, fontSize: 44, color: '#ffffff', font: 'Arial' }
   },
   'fb-mobile': {
     width: 1080,
     height: 1350,
-    title: { x: 0, y: 30, gravity: GRAVITY_VALUES.north, fontSize: 32, color: '#ffffff' },
-    tagline: { x: 0, y: 60, gravity: GRAVITY_VALUES.south, fontSize: 20, color: '#ffffff' },
+    title: { x: 0, y: 30, gravity: GRAVITY_VALUES.north, fontSize: 32, color: '#ffffff', font: 'Arial' },
+    tagline: { x: 0, y: 60, gravity: GRAVITY_VALUES.south, fontSize: 20, color: '#ffffff', font: 'Arial' },
     image: { width: 380, height: 280, x: 0, y: 60, gravity: GRAVITY_VALUES.center },
-    origPrice: { x: 0, y: -160, gravity: GRAVITY_VALUES.center, fontSize: 30, color: '#bbbbbb' },
-    price: { x: 0, y: -120, gravity: GRAVITY_VALUES.center, fontSize: 44, color: '#ffffff' }
+    origPrice: { x: 0, y: -160, gravity: GRAVITY_VALUES.center, fontSize: 30, color: '#bbbbbb', font: 'Arial' },
+    price: { x: 0, y: -120, gravity: GRAVITY_VALUES.center, fontSize: 44, color: '#ffffff', font: 'Arial' }
   }
 }
 
@@ -149,9 +165,25 @@ function DesignPlayground() {
         // Merge with DESIGN_RULES to ensure all properties exist
         const merged = {}
         Object.keys(DESIGN_RULES).forEach(designId => {
+          const designRule = DESIGN_RULES[designId]
+          const savedRule = parsed[designId] || {}
+          
+          // Deep merge layer properties (title, tagline, price, origPrice, image)
+          const layerKeys = ['title', 'tagline', 'price', 'origPrice', 'image']
+          const mergedLayers = {}
+          layerKeys.forEach(layerKey => {
+            if (designRule[layerKey] || savedRule[layerKey]) {
+              mergedLayers[layerKey] = {
+                ...(designRule[layerKey] || {}),
+                ...(savedRule[layerKey] || {})
+              }
+            }
+          })
+          
           merged[designId] = {
-            ...DESIGN_RULES[designId],
-            ...(parsed[designId] || {})
+            ...designRule,
+            ...savedRule,
+            ...mergedLayers
           }
         })
         return merged
@@ -438,6 +470,12 @@ function DesignPlayground() {
       }
       return hex.toLowerCase()
     }
+
+    // Convert font name to kebab-case for Cloudinary (e.g., "Open Sans" → "Open-Sans")
+    const fontToKebabCase = (fontName) => {
+      if (!fontName) return 'Arial'
+      return fontName.replace(/\s+/g, '-')
+    }
     
     // Get background color value
     const getBackgroundColorValue = () => {
@@ -616,6 +654,12 @@ function DesignPlayground() {
     const priceY = s(rules.price.y)
     const priceGravity = rules.price.gravity
 
+    // Get layer-specific fonts and format for Cloudinary (convert to kebab-case)
+    const titleFont = fontToKebabCase(rules.title.font || 'Arial')
+    const taglineFont = fontToKebabCase(rules.tagline.font || 'Arial')
+    const origPriceFont = fontToKebabCase(rules.origPrice.font || 'Arial')
+    const priceFont = fontToKebabCase(rules.price.font || 'Arial')
+
     // Construct transformation
     
     const transformParts = [
@@ -627,16 +671,16 @@ function DesignPlayground() {
       `$origprice_$price_mul_1.25`, // Logic logic stays same
       `c_crop,w_1,h_1,g_north_west`, // Base crop
       `c_pad,w_${padW},h_${padH},b_$bgcolor`, // Canvas
-      `l_text:Arial_${fontSizeTitle}_bold:$(title),co_rgb:${titleColor},fl_no_overflow`, // Title Layer
+      `l_text:${titleFont}_${fontSizeTitle}_bold:$(title),co_rgb:${titleColor},fl_no_overflow`, // Title Layer
       `fl_layer_apply,g_${titleGravity},x_${titleX},y_${titleY}`,
-      `l_text:Arial_${fontSizeTagline}_italic:$(tagline),co_rgb:${taglineColor},fl_no_overflow`, // Tagline Layer
+      `l_text:${taglineFont}_${fontSizeTagline}_italic:$(tagline),co_rgb:${taglineColor},fl_no_overflow`, // Tagline Layer
       `fl_layer_apply,g_${taglineGravity},x_${taglineX},y_${taglineY}`,
       `l_$img`, // Image Layer
       `c_fit,w_${imgW},h_${imgH}`,
       `fl_layer_apply,g_${imgGravity},x_${imgX},y_${imgY}`,
-      `l_text:Arial_${fontSizeOrigPrice}_strikethrough:%24$(origprice),co_rgb:${origPriceColor},fl_no_overflow`, // Orig Price Layer
+      `l_text:${origPriceFont}_${fontSizeOrigPrice}_strikethrough:%24$(origprice),co_rgb:${origPriceColor},fl_no_overflow`, // Orig Price Layer
       `fl_layer_apply,g_${origPriceGravity},x_${origPriceX},y_${origPriceY}`,
-      `l_text:Arial_${fontSizePrice}_bold:%24$(price),co_rgb:${priceColor},fl_no_overflow`, // Price Layer
+      `l_text:${priceFont}_${fontSizePrice}_bold:%24$(price),co_rgb:${priceColor},fl_no_overflow`, // Price Layer
       `fl_layer_apply,g_${priceGravity},x_${priceX},y_${priceY}`
     ]
 
@@ -767,6 +811,7 @@ function DesignPlayground() {
   const getFieldType = (key, layerName) => {
     if (key === 'color') return 'color'
     if (key === 'gravity') return 'gravity'
+    if (key === 'font') return 'font'
     if (key === 'width' || key === 'height' || key === 'x' || key === 'y' || key === 'fontSize') return 'number'
     return 'text'
   }
@@ -777,6 +822,11 @@ function DesignPlayground() {
       label: key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1').trim(),
       value: value
     }))
+  }
+
+  // Helper to get font options
+  const getFontOptions = () => {
+    return GOOGLE_FONTS
   }
 
   // Handle rule value update
@@ -816,7 +866,8 @@ function DesignPlayground() {
           let convertedValue = value
           if (key === 'fontSize' || key === 'width' || key === 'height' || key === 'x' || key === 'y') {
             convertedValue = key === 'fontSize' ? (isNaN(value) ? value : parseFloat(value)) : parseInt(value) || 0
-          } else if (key === 'gravity') {
+          } else if (key === 'gravity' || key === 'font' || key === 'color') {
+            // String values: gravity, font, color
             convertedValue = value
           }
           
@@ -1331,6 +1382,18 @@ function DesignPlayground() {
                               ))}
                             </select>
                           )
+                        } else if (fieldType === 'font') {
+                          inputElement = (
+                            <select
+                              value={currentValue || 'Arial'}
+                              onChange={(e) => handleRuleUpdate('Layers', layer.name, key, e.target.value)}
+                              className="rule-input rule-input-select"
+                            >
+                              {getFontOptions().map(font => (
+                                <option key={font.value} value={font.value}>{font.name}</option>
+                              ))}
+                            </select>
+                          )
                         } else if (fieldType === 'number') {
                           inputElement = (
                             <input
@@ -1510,6 +1573,92 @@ function DesignPlayground() {
                 value={formValues.price}
                 onChange={handleInputChange}
               />
+            </div>
+
+          </div>
+
+          {/* Layer Styles Section */}
+          <div className="control-section">
+            <h4 className="section-title">Layer Styles</h4>
+            
+            {/* Title Font */}
+            <div className="control-subsection">
+              <h5 className="subsection-title">Title</h5>
+              <div className="control-group">
+                <div className="label-row">
+                  <label>Font</label>
+                </div>
+                <select 
+                  value={editableRules[selectedDesign.id]?.title?.font || 'Arial'}
+                  onChange={(e) => handleRuleUpdate('Layers', 'Title', 'font', e.target.value)}
+                >
+                  {GOOGLE_FONTS.map(font => (
+                    <option key={font.value} value={font.value}>
+                      {font.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Tagline Font */}
+            <div className="control-subsection">
+              <h5 className="subsection-title">Tagline</h5>
+              <div className="control-group">
+                <div className="label-row">
+                  <label>Font</label>
+                </div>
+                <select 
+                  value={editableRules[selectedDesign.id]?.tagline?.font || 'Arial'}
+                  onChange={(e) => handleRuleUpdate('Layers', 'Tagline', 'font', e.target.value)}
+                >
+                  {GOOGLE_FONTS.map(font => (
+                    <option key={font.value} value={font.value}>
+                      {font.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Price Font */}
+            <div className="control-subsection">
+              <h5 className="subsection-title">Price</h5>
+              <div className="control-group">
+                <div className="label-row">
+                  <label>Font</label>
+                </div>
+                <select 
+                  value={editableRules[selectedDesign.id]?.price?.font || 'Arial'}
+                  onChange={(e) => handleRuleUpdate('Layers', 'Price', 'font', e.target.value)}
+                >
+                  {GOOGLE_FONTS.map(font => (
+                    <option key={font.value} value={font.value}>
+                      {font.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Original Price Font */}
+            <div className="control-subsection">
+              <h5 className="subsection-title">Original Price</h5>
+              <div className="control-group">
+                <div className="label-row">
+                  <label>Font</label>
+                </div>
+                <select 
+                  value={editableRules[selectedDesign.id]?.origPrice?.font || 'Arial'}
+                  onChange={(e) => handleRuleUpdate('Layers', 'Original Price', 'font', e.target.value)}
+                >
+                  {GOOGLE_FONTS.map(font => (
+                    <option key={font.value} value={font.value}>
+                      {font.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 
