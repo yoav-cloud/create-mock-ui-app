@@ -89,7 +89,10 @@ const DESIGN_RULES = {
   'parent': {
     width: 500,
     height: 900,
-    title: { x: 30, y: 40, gravity: GRAVITY_VALUES.northWest, fontSize: 32, color: '#ffffff', font: 'Arial', flNoOverflow: true, flTextDisallowOverflow: false, textWrap: true, textWidth: 400 },
+    showLogo: true,
+    logoPublicId: 'create/shoes/shoe-logo-small',
+    logo: { width: 100, height: 100, x: 10, y: 0, gravity: GRAVITY_VALUES.northEast },
+    title: { x: 20, y: 70, gravity: GRAVITY_VALUES.northWest, fontSize: 32, color: '#ffffff', font: 'Arial', flNoOverflow: true, flTextDisallowOverflow: false, textWrap: true, textWidth: 400 },
     tagline: { x: 30, y: 120, gravity: GRAVITY_VALUES.northEast, fontSize: 20, color: '#ffffff', font: 'Arial', flNoOverflow: true, flTextDisallowOverflow: false, textWrap: true, textWidth: 400 },
     image: { width: 300, height: 300, x: 10, y: 30, gravity: GRAVITY_VALUES.southEast },
     origPrice: { x: 30, y: 40, gravity: GRAVITY_VALUES.southWest, fontSize: 30, color: '#bbbbbb', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false },
@@ -98,7 +101,10 @@ const DESIGN_RULES = {
   'ig-ad': {
     width: 1080,
     height: 1080,
-    title: { x: 0, y: 65, gravity: GRAVITY_VALUES.north, fontSize: "110%", color: '#ffffff', font: 'Arial', flNoOverflow: true, flTextDisallowOverflow: false, textWrap: true, textWidth: 864 },
+    showLogo: true,
+    logoPublicId: 'create/shoes/shoe-logo-small',
+    logo: { width: 100, height: 100,  x: 10, y: 0, gravity: GRAVITY_VALUES.northEast },
+    title: { x: 0, y: 80, gravity: GRAVITY_VALUES.north, fontSize: "110%", color: '#ffffff', font: 'Arial', flNoOverflow: true, flTextDisallowOverflow: false, textWrap: true, textWidth: 864 },
     tagline: { x: 0, y: 100, gravity: GRAVITY_VALUES.north, fontSize: 20, color: '#ffffff', font: 'Arial', flNoOverflow: true, flTextDisallowOverflow: false, textWrap: true, textWidth: 864 },
     image: { width: 350, height: 250, x: 0, y: 120, gravity: GRAVITY_VALUES.north },
     origPrice: { x: -44, y: 60, gravity: GRAVITY_VALUES.south, fontSize: 30, color: '#bbbbbb', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false },
@@ -107,6 +113,9 @@ const DESIGN_RULES = {
   'fb-mobile': {
     width: 1080,
     height: 1350,
+    showLogo: true,
+    logoPublicId: 'create/shoes/shoe-logo-small',
+    logo: { width: 100, height: 100, x: 10, y: 0, gravity: GRAVITY_VALUES.northEast },
     title: { x: 0, y: 30, gravity: GRAVITY_VALUES.north, fontSize: 32, color: '#ffffff', font: 'Arial', flNoOverflow: true, flTextDisallowOverflow: false, textWrap: true, textWidth: 864 },
     tagline: { x: 0, y: 60, gravity: GRAVITY_VALUES.south, fontSize: 20, color: '#ffffff', font: 'Arial', flNoOverflow: true, flTextDisallowOverflow: false, textWrap: true, textWidth: 864 },
     image: { width: 380, height: 280, x: 0, y: 60, gravity: GRAVITY_VALUES.center },
@@ -168,8 +177,8 @@ function DesignPlayground() {
           const designRule = DESIGN_RULES[designId]
           const savedRule = parsed[designId] || {}
           
-          // Deep merge layer properties (title, tagline, price, origPrice, image)
-          const layerKeys = ['title', 'tagline', 'price', 'origPrice', 'image']
+          // Deep merge layer properties (title, tagline, price, origPrice, image, logo)
+          const layerKeys = ['title', 'tagline', 'price', 'origPrice', 'image', 'logo']
           const mergedLayers = {}
           layerKeys.forEach(layerKey => {
             if (designRule[layerKey] || savedRule[layerKey]) {
@@ -191,7 +200,10 @@ function DesignPlayground() {
           merged[designId] = {
             ...designRule,
             ...savedRule,
-            ...mergedLayers
+            ...mergedLayers,
+            // Ensure showLogo and logoPublicId are merged
+            showLogo: savedRule.showLogo !== undefined ? savedRule.showLogo : (designRule.showLogo !== undefined ? designRule.showLogo : true),
+            logoPublicId: savedRule.logoPublicId || designRule.logoPublicId || 'create/shoes/shoe-logo-small'
           }
         })
         // Ensure textWidth defaults for title and tagline in merged rules
@@ -688,6 +700,21 @@ function DesignPlayground() {
     const padW = canvasDimensions.width || rules.width
     const padH = canvasDimensions.height || rules.height
     
+    // Logo properties
+    const showLogo = rules.showLogo !== false // Default to true
+    const logoPublicId = rules.logoPublicId || 'create/shoes/shoe-logo-small'
+    const logoRules = rules.logo || { width: 100, height: 100, x: 0, y: 0, gravity: GRAVITY_VALUES.northWest }
+    
+    // Logo positioning - scale if needed
+    const logoW = s(logoRules.width)
+    const logoH = s(logoRules.height)
+    const logoX = s(logoRules.x)
+    const logoY = s(logoRules.y)
+    const logoGravity = logoRules.gravity || GRAVITY_VALUES.northWest
+    
+    // Clean logo public ID for use in layer (replace slashes with colons)
+    const logoPublicIdClean = logoPublicId.replace(/\//g, ':')
+    
     // Extract colors from rules and convert to RGB format for Cloudinary
     const titleColor = hexToRgb(rules.title.color || '#ffffff')
     const taglineColor = hexToRgb(rules.tagline.color || '#ffffff')
@@ -766,6 +793,12 @@ function DesignPlayground() {
       `$origprice_$price_mul_1.25`, // Logic logic stays same
       `c_crop,w_1,h_1,g_north_west`, // Base crop
       `c_pad,w_${padW},h_${padH},b_$bgcolor`, // Canvas
+      // Logo Layer (if enabled)
+      ...(showLogo ? [
+        `l_${logoPublicIdClean}`, // Logo Layer
+        `c_fit,w_${logoW},h_${logoH}`,
+        `fl_layer_apply,g_${logoGravity},x_${logoX},y_${logoY}`
+      ] : []),
       // Title Layer with optional text wrapping
       ...(rules.title.textWrap !== false 
         ? [`c_fit,l_text:${titleFont}_${fontSizeTitle}_bold:$(title),co_rgb:${titleColor},w_${rules.title.textWidth || Math.round(padW * 0.8)}`]
@@ -845,6 +878,14 @@ function DesignPlayground() {
       } else if (part.startsWith('l_$img')) {
         type = 'layer-image'
         rowKey = 'image-layer'
+      } else if (part.startsWith('l_') && !part.startsWith('l_text') && !part.startsWith('l_$img')) {
+        // Logo layer (l_ followed by public ID, but not l_text or l_$img)
+        type = 'layer-logo'
+        rowKey = 'logo-layer'
+      } else if (part.startsWith('c_fit') && index > 0 && parts[index - 1].startsWith('l_') && !parts[index - 1].startsWith('l_text') && !parts[index - 1].startsWith('l_$img')) {
+        // Logo layer sizing (c_fit after logo layer)
+        type = 'layer-logo'
+        rowKey = 'logo-layer'
       } else if (part.startsWith('fl_layer_apply')) {
         type = 'layer-apply'
         // Determine which layer based on context
@@ -858,6 +899,9 @@ function DesignPlayground() {
           rowKey = 'price-layer'
         } else if (index > 0 && parts[index - 1].includes('$img')) {
           rowKey = 'image-layer'
+        } else if (index > 1 && parts[index - 2].startsWith('l_') && !parts[index - 2].startsWith('l_text') && !parts[index - 2].startsWith('l_$img')) {
+          // Logo layer (fl_layer_apply after logo layer and c_fit)
+          rowKey = 'logo-layer'
         }
       }
       
@@ -945,6 +989,10 @@ function DesignPlayground() {
     // Canvas dimensions (width, height) are NEVER inherited
     if (propertyKey === 'width' || propertyKey === 'Height' || propertyKey === 'Width') {
       return false
+    }
+    // Logo properties (showLogo, logoPublicId) are inherited if inheritAll is ON
+    if (propertyKey === 'showLogo' || propertyKey === 'logoPublicId') {
+      return inheritanceToggles.inheritAll
     }
     // Style properties (color, font, flags, textWrap) are inherited if inheritStyles is ON
     const styleProperties = ['color', 'font', 'flNoOverflow', 'flTextDisallowOverflow', 'textWrap']
@@ -1051,10 +1099,63 @@ function DesignPlayground() {
           // Dimensions are never inherited, so no propagation
         } else if (key === 'Background Color') {
           setFormValues(prev => ({ ...prev, backgroundColor: value }))
+        } else if (key === 'showLogo') {
+          // Update showLogo
+          if (newRules[designId]) {
+            newRules[designId].showLogo = value
+          }
+          // Mark as overridden if child, propagate if parent
+          if (designId !== 'parent') {
+            setPropertyOverrides(prev => ({
+              ...prev,
+              [designId]: {
+                ...prev[designId],
+                _general: { ...prev[designId]?._general, showLogo: true }
+              }
+            }))
+          } else {
+            // Propagate to children if inheritAll is enabled
+            if (inheritanceToggles.inheritAll) {
+              Object.keys(newRules).forEach(childId => {
+                if (childId !== 'parent' && !isPropertyOverridden(childId, '_general', 'showLogo')) {
+                  if (newRules[childId]) {
+                    newRules[childId].showLogo = value
+                  }
+                }
+              })
+            }
+          }
+        } else if (key === 'logoPublicId') {
+          // Update logoPublicId
+          if (newRules[designId]) {
+            newRules[designId].logoPublicId = value
+          }
+          // Mark as overridden if child, propagate if parent
+          if (designId !== 'parent') {
+            setPropertyOverrides(prev => ({
+              ...prev,
+              [designId]: {
+                ...prev[designId],
+                _general: { ...prev[designId]?._general, logoPublicId: true }
+              }
+            }))
+          } else {
+            // Propagate to children if inheritAll is enabled
+            if (inheritanceToggles.inheritAll) {
+              Object.keys(newRules).forEach(childId => {
+                if (childId !== 'parent' && !isPropertyOverridden(childId, '_general', 'logoPublicId')) {
+                  if (newRules[childId]) {
+                    newRules[childId].logoPublicId = value
+                  }
+                }
+              })
+            }
+          }
         }
       } else if (category === 'Layers' && layerName) {
         // Map layer name to key
-        const layerKey = layerName === 'Original Price' ? 'origPrice' : 
+        const layerKey = layerName === 'Logo' ? 'logo' :
+                        layerName === 'Original Price' ? 'origPrice' : 
                         layerName === 'Title' ? 'title' :
                         layerName === 'Tagline' ? 'tagline' :
                         layerName === 'Price' ? 'price' : 'image'
@@ -1109,7 +1210,8 @@ function DesignPlayground() {
   // Helper to get layer key from layer name
   const getLayerKey = (layerName) => {
     if (!layerName) return null
-    return layerName === 'Original Price' ? 'origPrice' : 
+    return layerName === 'Logo' ? 'logo' :
+           layerName === 'Original Price' ? 'origPrice' : 
            layerName === 'Title' ? 'title' :
            layerName === 'Tagline' ? 'tagline' :
            layerName === 'Price' ? 'price' : 
@@ -1208,6 +1310,11 @@ function DesignPlayground() {
             setCanvasDimensions(prev => ({ ...prev, width: parentValue }))
           } else {
             setCanvasDimensions(prev => ({ ...prev, height: parentValue }))
+          }
+        } else if (key === 'showLogo' || key === 'logoPublicId') {
+          const parentValue = newRules['parent']?.[key]
+          if (parentValue !== undefined && newRules[designId]) {
+            newRules[designId][key] = parentValue
           }
         }
       } else if (category === 'Layers' && layerName && layerKey) {
@@ -1573,7 +1680,6 @@ function DesignPlayground() {
               <table className="rules-table">
                 <thead>
                   <tr>
-                    <th>Category</th>
                     <th>Property</th>
                     <th>Value</th>
                   </tr>
@@ -1581,10 +1687,9 @@ function DesignPlayground() {
                 <tbody>
                   {/* General Rules */}
                   <tr className="category-row">
-                    <td colSpan="3"><strong>General</strong></td>
+                    <td colSpan="2"><strong>General</strong></td>
                   </tr>
                   <tr data-row-key="canvas-dimensions">
-                    <td>General</td>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         Width
@@ -1652,7 +1757,6 @@ function DesignPlayground() {
                     </td>
                   </tr>
                   <tr data-row-key="canvas-dimensions">
-                    <td>General</td>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         Height
@@ -1720,7 +1824,6 @@ function DesignPlayground() {
                     </td>
                   </tr>
                   <tr data-row-key="background-color">
-                    <td>General</td>
                     <td>Background Color</td>
                     <td>
                       <input
@@ -1734,14 +1837,149 @@ function DesignPlayground() {
                       />
                     </td>
                   </tr>
+                  <tr data-row-key="logo-show">
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        Show Logo
+                        {(() => {
+                          const isInherited = isPropertyInherited('General', null, 'showLogo')
+                          const isOverridden = isPropertyOverriddenForDisplay('General', null, 'showLogo')
+                          const wouldBeInherited = wouldPropertyBeInherited('General', null, 'showLogo')
+                          const showIcon = isInherited || (isOverridden && wouldBeInherited)
+                          return showIcon ? (
+                            <svg 
+                              width="14" 
+                              height="14" 
+                              viewBox="0 0 24 24" 
+                              fill="none" 
+                              stroke={isInherited ? "var(--active-color)" : "#888"} 
+                              strokeWidth="2" 
+                              style={{ opacity: isInherited ? 0.7 : 0.4 }} 
+                              title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
+                            >
+                              <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                              <path d="M2 17l10 5 10-5"></path>
+                              <path d="M2 12l10 5 10-5"></path>
+                            </svg>
+                          ) : null
+                        })()}
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <div className="toggle-wrapper" onClick={() => {
+                          const currentValue = editableRules[selectedDesign.id]?.showLogo !== false
+                          handleRuleUpdate('General', null, 'showLogo', !currentValue)
+                        }}>
+                          <div className={`toggle-track ${(editableRules[selectedDesign.id]?.showLogo !== false) ? 'active' : ''}`}>
+                            <div className="toggle-thumb"></div>
+                          </div>
+                        </div>
+                        {isPropertyOverriddenForDisplay('General', null, 'showLogo') && (
+                          <button
+                            className="reset-property-btn"
+                            onClick={() => handleResetProperty('General', null, 'showLogo')}
+                            title="Reset to inherited value"
+                            style={{
+                              padding: '0.25rem 0.5rem',
+                              fontSize: '0.75rem',
+                              backgroundColor: 'transparent',
+                              border: '1px solid #555',
+                              borderRadius: '4px',
+                              color: '#aaa',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.target.style.borderColor = 'var(--active-color)'
+                              e.target.style.color = 'var(--active-color)'
+                            }}
+                            onMouseLeave={(e) => {
+                              e.target.style.borderColor = '#555'
+                              e.target.style.color = '#aaa'
+                            }}
+                          >
+                            Reset
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                  <tr data-row-key="logo-public-id">
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        Logo Public ID
+                        {(() => {
+                          const isInherited = isPropertyInherited('General', null, 'logoPublicId')
+                          const isOverridden = isPropertyOverriddenForDisplay('General', null, 'logoPublicId')
+                          const wouldBeInherited = wouldPropertyBeInherited('General', null, 'logoPublicId')
+                          const showIcon = isInherited || (isOverridden && wouldBeInherited)
+                          return showIcon ? (
+                            <svg 
+                              width="14" 
+                              height="14" 
+                              viewBox="0 0 24 24" 
+                              fill="none" 
+                              stroke={isInherited ? "var(--active-color)" : "#888"} 
+                              strokeWidth="2" 
+                              style={{ opacity: isInherited ? 0.7 : 0.4 }} 
+                              title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
+                            >
+                              <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                              <path d="M2 17l10 5 10-5"></path>
+                              <path d="M2 12l10 5 10-5"></path>
+                            </svg>
+                          ) : null
+                        })()}
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <input
+                          type="text"
+                          value={editableRules[selectedDesign.id]?.logoPublicId || 'create/shoes/shoe-logo-small'}
+                          onChange={(e) => handleRuleUpdate('General', null, 'logoPublicId', e.target.value)}
+                          className="rule-input"
+                        />
+                        {isPropertyOverriddenForDisplay('General', null, 'logoPublicId') && (
+                          <button
+                            className="reset-property-btn"
+                            onClick={() => handleResetProperty('General', null, 'logoPublicId')}
+                            title="Reset to inherited value"
+                            style={{
+                              padding: '0.25rem 0.5rem',
+                              fontSize: '0.75rem',
+                              backgroundColor: 'transparent',
+                              border: '1px solid #555',
+                              borderRadius: '4px',
+                              color: '#aaa',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.target.style.borderColor = 'var(--active-color)'
+                              e.target.style.color = 'var(--active-color)'
+                            }}
+                            onMouseLeave={(e) => {
+                              e.target.style.borderColor = '#555'
+                              e.target.style.color = '#aaa'
+                            }}
+                          >
+                            Reset
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
                   
                   {/* Layer Rules */}
                   <tr className="category-row">
-                    <td colSpan="3"><strong>Layers</strong></td>
+                    <td colSpan="2"><strong>Layers</strong></td>
                   </tr>
                   {(() => {
                     const rules = editableRules[selectedDesign.id] || editableRules['parent']
                     const layers = [
+                      { name: 'Logo', data: rules.logo, key: 'logo' },
                       { name: 'Title', data: rules.title, key: 'title' },
                       { name: 'Tagline', data: rules.tagline, key: 'tagline' },
                       { name: 'Image', data: rules.image, key: 'image' },
@@ -1752,6 +1990,7 @@ function DesignPlayground() {
                       const rows = []
                       // Map layer names to row keys
                       const rowKeyMap = {
+                        'Logo': 'logo-layer',
                         'Title': 'title-layer',
                         'Tagline': 'tagline-layer',
                         'Image': 'image-layer',
@@ -1763,13 +2002,20 @@ function DesignPlayground() {
                       // Add sub-category row for the layer
                       rows.push(
                         <tr key={`${layer.name}-header`} className="sub-category-row" data-row-key={rowKey}>
-                          <td colSpan="3"><strong>{layer.name}</strong></td>
+                          <td colSpan="2"><strong>{layer.name}</strong></td>
                         </tr>
                       )
                       // Add property rows without layer name
+                      // Skip if layer data is missing
+                      if (!layer.data) {
+                        return rows
+                      }
                       Object.entries(layer.data).forEach(([key, value]) => {
                         const fieldType = getFieldType(key, layer.name)
-                        const currentValue = value
+                        // Read current value directly from editableRules to ensure it's always up-to-date
+                        const currentValue = editableRules[selectedDesign.id]?.[layer.key]?.[key] ?? 
+                                           editableRules['parent']?.[layer.key]?.[key] ?? 
+                                           value
                         
                         let inputElement
                         if (fieldType === 'color') {
@@ -1876,7 +2122,6 @@ function DesignPlayground() {
                         
                         rows.push(
                           <tr key={`${layer.name}-${key}`} data-row-key={rowKey}>
-                            <td></td>
                             <td>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                 {key}
@@ -2024,6 +2269,141 @@ function DesignPlayground() {
                 }}
                 title={useMetadata.backgroundColor ? 'Using metadata value (pbackgroundcolor)' : 'Background color'}
               />
+            </div>
+
+            <div className="control-group">
+              <div className="label-row">
+                <label>Show Logo</label>
+                {(() => {
+                  const isInherited = isPropertyInherited('General', null, 'showLogo')
+                  const isOverridden = isPropertyOverriddenForDisplay('General', null, 'showLogo')
+                  const wouldBeInherited = wouldPropertyBeInherited('General', null, 'showLogo')
+                  const showIcon = isInherited || (isOverridden && wouldBeInherited)
+                  return showIcon ? (
+                    <svg 
+                      width="14" 
+                      height="14" 
+                      viewBox="0 0 24 24" 
+                      fill="none" 
+                      stroke={isInherited ? "var(--active-color)" : "#888"} 
+                      strokeWidth="2" 
+                      style={{ opacity: isInherited ? 0.7 : 0.4 }} 
+                      title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
+                    >
+                      <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                      <path d="M2 17l10 5 10-5"></path>
+                      <path d="M2 12l10 5 10-5"></path>
+                    </svg>
+                  ) : null
+                })()}
+              </div>
+              <div className="toggle-wrapper" onClick={() => {
+                const currentValue = editableRules[selectedDesign.id]?.showLogo !== false
+                handleRuleUpdate('General', null, 'showLogo', !currentValue)
+              }}>
+                <div className={`toggle-track ${(editableRules[selectedDesign.id]?.showLogo !== false) ? 'active' : ''}`}>
+                  <div className="toggle-thumb"></div>
+                </div>
+              </div>
+              {isPropertyOverriddenForDisplay('General', null, 'showLogo') && (
+                <button
+                  className="reset-property-btn"
+                  onClick={() => handleResetProperty('General', null, 'showLogo')}
+                  title="Reset to inherited value"
+                  style={{
+                    marginTop: '0.5rem',
+                    padding: '0.25rem 0.5rem',
+                    fontSize: '0.75rem',
+                    backgroundColor: 'transparent',
+                    border: '1px solid #555',
+                    borderRadius: '4px',
+                    color: '#aaa',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    whiteSpace: 'nowrap'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.borderColor = 'var(--active-color)'
+                    e.target.style.color = 'var(--active-color)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.borderColor = '#555'
+                    e.target.style.color = '#aaa'
+                  }}
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+
+            <div className="control-group">
+              <div className="label-row">
+                <label>Logo Public ID</label>
+                {(() => {
+                  const isInherited = isPropertyInherited('General', null, 'logoPublicId')
+                  const isOverridden = isPropertyOverriddenForDisplay('General', null, 'logoPublicId')
+                  const wouldBeInherited = wouldPropertyBeInherited('General', null, 'logoPublicId')
+                  const showIcon = isInherited || (isOverridden && wouldBeInherited)
+                  return showIcon ? (
+                    <svg 
+                      width="14" 
+                      height="14" 
+                      viewBox="0 0 24 24" 
+                      fill="none" 
+                      stroke={isInherited ? "var(--active-color)" : "#888"} 
+                      strokeWidth="2" 
+                      style={{ opacity: isInherited ? 0.7 : 0.4 }} 
+                      title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
+                    >
+                      <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                      <path d="M2 17l10 5 10-5"></path>
+                      <path d="M2 12l10 5 10-5"></path>
+                    </svg>
+                  ) : null
+                })()}
+              </div>
+              <input
+                type="text"
+                value={editableRules[selectedDesign.id]?.logoPublicId || 'create/shoes/shoe-logo-small'}
+                onChange={(e) => handleRuleUpdate('General', null, 'logoPublicId', e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  border: '1px solid #444',
+                  borderRadius: '4px',
+                  backgroundColor: '#2a2a2a',
+                  color: '#fff'
+                }}
+              />
+              {isPropertyOverriddenForDisplay('General', null, 'logoPublicId') && (
+                <button
+                  className="reset-property-btn"
+                  onClick={() => handleResetProperty('General', null, 'logoPublicId')}
+                  title="Reset to inherited value"
+                  style={{
+                    marginTop: '0.5rem',
+                    padding: '0.25rem 0.5rem',
+                    fontSize: '0.75rem',
+                    backgroundColor: 'transparent',
+                    border: '1px solid #555',
+                    borderRadius: '4px',
+                    color: '#aaa',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    whiteSpace: 'nowrap'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.borderColor = 'var(--active-color)'
+                    e.target.style.color = 'var(--active-color)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.borderColor = '#555'
+                    e.target.style.color = '#aaa'
+                  }}
+                >
+                  Reset
+                </button>
+              )}
             </div>
           </div>
 

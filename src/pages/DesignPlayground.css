@@ -446,6 +446,11 @@
   background-color: rgba(81, 207, 102, 0.1);
 }
 
+.url-segment-layer-logo {
+  color: #9C27B0;
+  background-color: rgba(156, 39, 176, 0.1);
+}
+
 .url-segment-layer-title {
   color: #ffd43b;
   background-color: rgba(255, 212, 59, 0.1);
@@ -497,6 +502,7 @@
   background-color: #252525;
   border-radius: 4px;
   overflow: hidden;
+  table-layout: fixed;
 }
 
 .rules-table thead {
@@ -512,6 +518,14 @@
   font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+
+.rules-table th:first-child {
+  width: 40%;
+}
+
+.rules-table th:last-child {
+  width: 60%;
 }
 
 .rules-table td {
