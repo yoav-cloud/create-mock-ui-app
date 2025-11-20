@@ -986,8 +986,9 @@ function DesignPlayground() {
 
   // Helper to check if a property should be inherited based on type and toggles
   const shouldInheritProperty = (propertyKey) => {
-    // Canvas dimensions (width, height) are NEVER inherited
-    if (propertyKey === 'width' || propertyKey === 'Height' || propertyKey === 'Width') {
+    // Canvas dimensions (Width, Height with capital letters) are NEVER inherited
+    // This only applies to General category canvas dimensions, not layer width/height
+    if (propertyKey === 'Width' || propertyKey === 'Height') {
       return false
     }
     // Logo properties (showLogo, logoPublicId) are inherited if inheritAll is ON
@@ -999,8 +1000,9 @@ function DesignPlayground() {
     if (styleProperties.includes(propertyKey)) {
       return inheritanceToggles.inheritStyles
     }
-    // Position/size properties (x, y, fontSize, gravity, textWidth) are inherited if inheritAll is ON
-    const positionSizeProperties = ['x', 'y', 'fontSize', 'gravity', 'textWidth']
+    // Position/size properties (x, y, width, height, fontSize, gravity, textWidth) are inherited if inheritAll is ON
+    // Note: width/height here refer to layer dimensions (like logo, image), not canvas dimensions
+    const positionSizeProperties = ['x', 'y', 'width', 'height', 'fontSize', 'gravity', 'textWidth']
     if (positionSizeProperties.includes(propertyKey)) {
       return inheritanceToggles.inheritAll
     }
