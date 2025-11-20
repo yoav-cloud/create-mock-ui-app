@@ -98,11 +98,11 @@ const DESIGN_RULES = {
   'ig-ad': {
     width: 1080,
     height: 1080,
-    title: { x: 0, y: 65, gravity: GRAVITY_VALUES.north, fontSize: 32, color: '#ffffff', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false },
+    title: { x: 0, y: 65, gravity: GRAVITY_VALUES.north, fontSize: "110%", color: '#ffffff', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false },
     tagline: { x: 0, y: 100, gravity: GRAVITY_VALUES.north, fontSize: 20, color: '#ffffff', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false },
     image: { width: 350, height: 250, x: 0, y: 120, gravity: GRAVITY_VALUES.north },
-    origPrice: { x: -50, y: 60, gravity: GRAVITY_VALUES.south, fontSize: 30, color: '#bbbbbb', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false },
-    price: { x: 50, y: 50, gravity: GRAVITY_VALUES.south, fontSize: 44, color: '#ffffff', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false }
+    origPrice: { x: -44, y: 60, gravity: GRAVITY_VALUES.south, fontSize: 30, color: '#bbbbbb', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false },
+    price: { x: 0, y: 50, gravity: GRAVITY_VALUES.south, fontSize: 44, color: '#ffffff', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false }
   },
   'fb-mobile': {
     width: 1080,
@@ -110,8 +110,8 @@ const DESIGN_RULES = {
     title: { x: 0, y: 30, gravity: GRAVITY_VALUES.north, fontSize: 32, color: '#ffffff', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false },
     tagline: { x: 0, y: 60, gravity: GRAVITY_VALUES.south, fontSize: 20, color: '#ffffff', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false },
     image: { width: 380, height: 280, x: 0, y: 60, gravity: GRAVITY_VALUES.center },
-    origPrice: { x: 0, y: -160, gravity: GRAVITY_VALUES.center, fontSize: 30, color: '#bbbbbb', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false },
-    price: { x: 0, y: -120, gravity: GRAVITY_VALUES.center, fontSize: 44, color: '#ffffff', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false }
+    origPrice: { x: 0, y: -140, gravity: GRAVITY_VALUES.center, fontSize: "120%", color: '#bbbbbb', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false },
+    price: { x: 0, y: -120, gravity: GRAVITY_VALUES.center, fontSize: "150%", color: '#ffffff', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false }
   }
 }
 
@@ -379,6 +379,8 @@ function DesignPlayground() {
   const [currentImageUrl, setCurrentImageUrl] = useState('')
   // Track if this is the initial load (don't show toast on initial load)
   const isInitialLoad = useRef(true)
+  // Store previous fontSize values for validation/revert
+  const fontSizePreviousValues = useRef({})
   const [showVerboseUrl, setShowVerboseUrl] = useState(() => {
     const saved = localStorage.getItem('playground_verbose')
     return saved !== null ? JSON.parse(saved) : true // Default to verbose (Cloudinary standard)
@@ -401,7 +403,7 @@ function DesignPlayground() {
     const s = (val) => Math.round(val * scale)
     
     // Helper function to calculate font size with percentage support
-    // fontSize can be a number (absolute) or a string like "50%" (relative to parentValue)
+    // fontSize can be a number (absolute) or a string like "50%" (relative to parentValue) or "32" (string number)
     // Font sizes are NOT scaled - they remain the same pixel size regardless of canvas size
     const calculateFontSize = (fontSize, parentValue) => {
       if (typeof fontSize === 'string' && fontSize.endsWith('%')) {
@@ -414,7 +416,12 @@ function DesignPlayground() {
         return Math.round(parentRawValue * percentage)
       }
       // Absolute value - use as-is, no scaling
-      return typeof fontSize === 'number' ? fontSize : parseFloat(fontSize) || 0
+      // Handle both number and string number (e.g., "32")
+      if (typeof fontSize === 'number') {
+        return fontSize
+      }
+      const parsed = parseFloat(fontSize)
+      return isNaN(parsed) ? 0 : parsed
     }
     
     const escapeCloudinaryString = (str) => {
@@ -867,7 +874,8 @@ function DesignPlayground() {
     if (key === 'gravity') return 'gravity'
     if (key === 'font') return 'font'
     if (key === 'flNoOverflow' || key === 'flTextDisallowOverflow') return 'boolean'
-    if (key === 'width' || key === 'height' || key === 'x' || key === 'y' || key === 'fontSize') return 'number'
+    if (key === 'fontSize') return 'fontSize' // Special type for fontSize (text input with validation)
+    if (key === 'width' || key === 'height' || key === 'x' || key === 'y') return 'number'
     return 'text'
   }
 
@@ -939,6 +947,23 @@ function DesignPlayground() {
     return newRules
   }
 
+  // Handle fontSize validation and revert (prevent percentage in parent)
+  const handleFontSizeValidation = (category, layerName, key, value, previousValue) => {
+    const designId = selectedDesign.id
+    
+    // Check if parent design and value contains percentage
+    if (designId === 'parent' && typeof value === 'string' && value.includes('%')) {
+      toast.error('Parent design cannot use percentage values for font size')
+      // Revert to previous value
+      if (previousValue !== undefined && previousValue !== null) {
+        handleRuleUpdate(category, layerName, key, previousValue)
+      }
+      return false
+    }
+    
+    return true
+  }
+
   // Handle rule value update
   const handleRuleUpdate = (category, layerName, key, value) => {
     setEditableRules(prev => {
@@ -996,8 +1021,16 @@ function DesignPlayground() {
         if (newRules[designId] && newRules[designId][layerKey]) {
           // Convert value based on type
           let convertedValue = value
-          if (key === 'fontSize' || key === 'width' || key === 'height' || key === 'x' || key === 'y') {
-            convertedValue = key === 'fontSize' ? (isNaN(value) ? value : parseFloat(value)) : parseInt(value) || 0
+          if (key === 'fontSize') {
+            // fontSize can be a number or a string with percentage (e.g., "110%")
+            // Keep as string if it contains %, otherwise convert to number
+            if (typeof value === 'string' && value.includes('%')) {
+              convertedValue = value // Keep as string for percentage
+            } else {
+              convertedValue = isNaN(value) ? value : parseFloat(value)
+            }
+          } else if (key === 'width' || key === 'height' || key === 'x' || key === 'y') {
+            convertedValue = parseInt(value) || 0
           } else if (key === 'gravity' || key === 'font' || key === 'color') {
             // String values: gravity, font, color
             convertedValue = value
@@ -1795,6 +1828,41 @@ function DesignPlayground() {
                                 <option key={font.value} value={font.value}>{font.name}</option>
                               ))}
                             </select>
+                          )
+                        } else if (fieldType === 'fontSize') {
+                          // fontSize: text input with validation (no percentage in parent)
+                          const inputKey = `${selectedDesign.id}-${layer.name}-${key}`
+                          inputElement = (
+                            <input
+                              type="text"
+                              value={String(currentValue || '')}
+                              onFocus={(e) => {
+                                // Store the value when focused (before any changes)
+                                fontSizePreviousValues.current[inputKey] = currentValue
+                              }}
+                              onChange={(e) => {
+                                // Allow typing freely, validation happens on blur/enter
+                                handleRuleUpdate('Layers', layer.name, key, e.target.value)
+                              }}
+                              onBlur={(e) => {
+                                // Validate on blur and revert if invalid
+                                const previousValue = fontSizePreviousValues.current[inputKey]
+                                handleFontSizeValidation('Layers', layer.name, key, e.target.value, previousValue)
+                                // Clean up
+                                delete fontSizePreviousValues.current[inputKey]
+                              }}
+                              onKeyDown={(e) => {
+                                // Validate on Enter key
+                                if (e.key === 'Enter') {
+                                  e.preventDefault()
+                                  const previousValue = fontSizePreviousValues.current[inputKey]
+                                  handleFontSizeValidation('Layers', layer.name, key, e.target.value, previousValue)
+                                  delete fontSizePreviousValues.current[inputKey]
+                                  e.target.blur()
+                                }
+                              }}
+                              className="rule-input rule-input-text"
+                            />
                           )
                         } else if (fieldType === 'number') {
                           inputElement = (
