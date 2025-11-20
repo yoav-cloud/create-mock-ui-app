@@ -402,14 +402,19 @@ function DesignPlayground() {
     
     // Helper function to calculate font size with percentage support
     // fontSize can be a number (absolute) or a string like "50%" (relative to parentValue)
-    const calculateFontSize = (fontSize, parentValue, scaleFn) => {
+    // Font sizes are NOT scaled - they remain the same pixel size regardless of canvas size
+    const calculateFontSize = (fontSize, parentValue) => {
       if (typeof fontSize === 'string' && fontSize.endsWith('%')) {
-        // Percentage value: calculate relative to parent
+        // Percentage value: calculate relative to parent's raw value
         const percentage = parseFloat(fontSize) / 100
-        return scaleFn(parentValue * percentage)
+        // Get parent's raw value (not scaled)
+        const parentRawValue = typeof parentValue === 'string' && parentValue.endsWith('%')
+          ? 32 // Fallback if parent is also percentage
+          : (typeof parentValue === 'number' ? parentValue : parseFloat(parentValue) || 32)
+        return Math.round(parentRawValue * percentage)
       }
-      // Absolute value
-      return scaleFn(fontSize)
+      // Absolute value - use as-is, no scaling
+      return typeof fontSize === 'number' ? fontSize : parseFloat(fontSize) || 0
     }
     
     const escapeCloudinaryString = (str) => {
@@ -650,13 +655,13 @@ function DesignPlayground() {
       ? 32 // Default base if title itself is percentage (shouldn't happen, but fallback)
       : rules.title.fontSize
     
-    // Calculate title font size (scaled)
-    const fontSizeTitle = calculateFontSize(rules.title.fontSize, baseTitleSize, s)
+    // Calculate title font size (not scaled - font sizes remain absolute)
+    const fontSizeTitle = calculateFontSize(rules.title.fontSize, baseTitleSize)
     
-    // Calculate other font sizes relative to title's base (unscaled) value, then scale
-    const fontSizeTagline = calculateFontSize(rules.tagline.fontSize, baseTitleSize, s)
-    const fontSizePrice = calculateFontSize(rules.price.fontSize, baseTitleSize, s)
-    const fontSizeOrigPrice = calculateFontSize(rules.origPrice.fontSize, baseTitleSize, s)
+    // Calculate other font sizes relative to title's base value (not scaled)
+    const fontSizeTagline = calculateFontSize(rules.tagline.fontSize, baseTitleSize)
+    const fontSizePrice = calculateFontSize(rules.price.fontSize, baseTitleSize)
+    const fontSizeOrigPrice = calculateFontSize(rules.origPrice.fontSize, baseTitleSize)
     
     // Apply rules with scaling
     const titleX = s(rules.title.x)
