@@ -89,8 +89,8 @@ const DESIGN_RULES = {
   'parent': {
     width: 500,
     height: 900,
-    title: { x: 30, y: 40, gravity: GRAVITY_VALUES.northWest, fontSize: 32, color: '#ffffff', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false },
-    tagline: { x: 30, y: 120, gravity: GRAVITY_VALUES.northEast, fontSize: 20, color: '#ffffff', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false },
+    title: { x: 30, y: 40, gravity: GRAVITY_VALUES.northWest, fontSize: 32, color: '#ffffff', font: 'Arial', flNoOverflow: true, flTextDisallowOverflow: false, textWrap: true, textWidth: 400 },
+    tagline: { x: 30, y: 120, gravity: GRAVITY_VALUES.northEast, fontSize: 20, color: '#ffffff', font: 'Arial', flNoOverflow: true, flTextDisallowOverflow: false, textWrap: true, textWidth: 400 },
     image: { width: 300, height: 300, x: 10, y: 30, gravity: GRAVITY_VALUES.southEast },
     origPrice: { x: 30, y: 40, gravity: GRAVITY_VALUES.southWest, fontSize: 30, color: '#bbbbbb', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false },
     price: { x: 130, y: 40, gravity: GRAVITY_VALUES.southWest, fontSize: 44, color: '#ffffff', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false }
@@ -98,8 +98,8 @@ const DESIGN_RULES = {
   'ig-ad': {
     width: 1080,
     height: 1080,
-    title: { x: 0, y: 65, gravity: GRAVITY_VALUES.north, fontSize: "110%", color: '#ffffff', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false },
-    tagline: { x: 0, y: 100, gravity: GRAVITY_VALUES.north, fontSize: 20, color: '#ffffff', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false },
+    title: { x: 0, y: 65, gravity: GRAVITY_VALUES.north, fontSize: "110%", color: '#ffffff', font: 'Arial', flNoOverflow: true, flTextDisallowOverflow: false, textWrap: true, textWidth: 864 },
+    tagline: { x: 0, y: 100, gravity: GRAVITY_VALUES.north, fontSize: 20, color: '#ffffff', font: 'Arial', flNoOverflow: true, flTextDisallowOverflow: false, textWrap: true, textWidth: 864 },
     image: { width: 350, height: 250, x: 0, y: 120, gravity: GRAVITY_VALUES.north },
     origPrice: { x: -44, y: 60, gravity: GRAVITY_VALUES.south, fontSize: 30, color: '#bbbbbb', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false },
     price: { x: 0, y: 50, gravity: GRAVITY_VALUES.south, fontSize: 44, color: '#ffffff', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false }
@@ -107,8 +107,8 @@ const DESIGN_RULES = {
   'fb-mobile': {
     width: 1080,
     height: 1350,
-    title: { x: 0, y: 30, gravity: GRAVITY_VALUES.north, fontSize: 32, color: '#ffffff', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false },
-    tagline: { x: 0, y: 60, gravity: GRAVITY_VALUES.south, fontSize: 20, color: '#ffffff', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false },
+    title: { x: 0, y: 30, gravity: GRAVITY_VALUES.north, fontSize: 32, color: '#ffffff', font: 'Arial', flNoOverflow: true, flTextDisallowOverflow: false, textWrap: true, textWidth: 864 },
+    tagline: { x: 0, y: 60, gravity: GRAVITY_VALUES.south, fontSize: 20, color: '#ffffff', font: 'Arial', flNoOverflow: true, flTextDisallowOverflow: false, textWrap: true, textWidth: 864 },
     image: { width: 380, height: 280, x: 0, y: 60, gravity: GRAVITY_VALUES.center },
     origPrice: { x: 0, y: -140, gravity: GRAVITY_VALUES.center, fontSize: "120%", color: '#bbbbbb', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false },
     price: { x: 0, y: -120, gravity: GRAVITY_VALUES.center, fontSize: "150%", color: '#ffffff', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false }
@@ -177,6 +177,14 @@ function DesignPlayground() {
                 ...(designRule[layerKey] || {}),
                 ...(savedRule[layerKey] || {})
               }
+              // Ensure textWidth defaults to 80% of canvas width for title and tagline
+              if ((layerKey === 'title' || layerKey === 'tagline') && !mergedLayers[layerKey].textWidth) {
+                mergedLayers[layerKey].textWidth = Math.round((designRule.width || 500) * 0.8)
+              }
+              // Ensure textWrap defaults to true for title and tagline
+              if ((layerKey === 'title' || layerKey === 'tagline') && mergedLayers[layerKey].textWrap === undefined) {
+                mergedLayers[layerKey].textWrap = true
+              }
             }
           })
           
@@ -186,13 +194,51 @@ function DesignPlayground() {
             ...mergedLayers
           }
         })
+        // Ensure textWidth defaults for title and tagline in merged rules
+        Object.keys(merged).forEach(designId => {
+          const designRule = merged[designId]
+          if (designRule.title && !designRule.title.textWidth) {
+            designRule.title.textWidth = Math.round((designRule.width || 500) * 0.8)
+          }
+          if (designRule.tagline && !designRule.tagline.textWidth) {
+            designRule.tagline.textWidth = Math.round((designRule.width || 500) * 0.8)
+          }
+          if (designRule.title && designRule.title.textWrap === undefined) {
+            designRule.title.textWrap = true
+          }
+          if (designRule.tagline && designRule.tagline.textWrap === undefined) {
+            designRule.tagline.textWrap = true
+          }
+        })
         return merged
       } catch (e) {
         // If parsing fails, use DESIGN_RULES
-        return JSON.parse(JSON.stringify(DESIGN_RULES))
+        const defaultRules = JSON.parse(JSON.stringify(DESIGN_RULES))
+        // Ensure textWidth defaults
+        Object.keys(defaultRules).forEach(designId => {
+          const designRule = defaultRules[designId]
+          if (designRule.title && !designRule.title.textWidth) {
+            designRule.title.textWidth = Math.round((designRule.width || 500) * 0.8)
+          }
+          if (designRule.tagline && !designRule.tagline.textWidth) {
+            designRule.tagline.textWidth = Math.round((designRule.width || 500) * 0.8)
+          }
+        })
+        return defaultRules
       }
     }
-    return JSON.parse(JSON.stringify(DESIGN_RULES))
+    const defaultRules = JSON.parse(JSON.stringify(DESIGN_RULES))
+    // Ensure textWidth defaults
+    Object.keys(defaultRules).forEach(designId => {
+      const designRule = defaultRules[designId]
+      if (designRule.title && !designRule.title.textWidth) {
+        designRule.title.textWidth = Math.round((designRule.width || 500) * 0.8)
+      }
+      if (designRule.tagline && !designRule.tagline.textWidth) {
+        designRule.tagline.textWidth = Math.round((designRule.width || 500) * 0.8)
+      }
+    })
+    return defaultRules
   })
 
   const [useMetadata, setUseMetadata] = useState(() => {
@@ -728,21 +774,25 @@ function DesignPlayground() {
       `$origprice_$price_mul_1.25`, // Logic logic stays same
       `c_crop,w_1,h_1,g_north_west`, // Base crop
       `c_pad,w_${padW},h_${padH},b_$bgcolor`, // Canvas
-      `l_text:${titleFont}_${fontSizeTitle}_bold:$(title),co_rgb:${titleColor}`, // Title Layer
-      `fl_layer_apply,g_${titleGravity},x_${titleX},y_${titleY}`,
-      ...titleFlags, // Title flags after fl_layer_apply
-      `l_text:${taglineFont}_${fontSizeTagline}_italic:$(tagline),co_rgb:${taglineColor}`, // Tagline Layer
-      `fl_layer_apply,g_${taglineGravity},x_${taglineX},y_${taglineY}`,
-      ...taglineFlags, // Tagline flags after fl_layer_apply
+      // Title Layer with optional text wrapping
+      ...(rules.title.textWrap !== false 
+        ? [`c_fit,l_text:${titleFont}_${fontSizeTitle}_bold:$(title),co_rgb:${titleColor},w_${rules.title.textWidth || Math.round(padW * 0.8)}`]
+        : [`l_text:${titleFont}_${fontSizeTitle}_bold:$(title),co_rgb:${titleColor}`]
+      ), // Title Layer
+      `fl_layer_apply,g_${titleGravity},x_${titleX},y_${titleY}${titleFlags.length > 0 ? ',' + titleFlags.join(',') : ''}`, // Title flags in same part as fl_layer_apply
+      // Tagline Layer with optional text wrapping
+      ...(rules.tagline.textWrap !== false 
+        ? [`c_fit,l_text:${taglineFont}_${fontSizeTagline}_italic:$(tagline),co_rgb:${taglineColor},w_${rules.tagline.textWidth || Math.round(padW * 0.8)}`]
+        : [`l_text:${taglineFont}_${fontSizeTagline}_italic:$(tagline),co_rgb:${taglineColor}`]
+      ), // Tagline Layer
+      `fl_layer_apply,g_${taglineGravity},x_${taglineX},y_${taglineY}${taglineFlags.length > 0 ? ',' + taglineFlags.join(',') : ''}`, // Tagline flags in same part as fl_layer_apply
       `l_$img`, // Image Layer
       `c_fit,w_${imgW},h_${imgH}`,
       `fl_layer_apply,g_${imgGravity},x_${imgX},y_${imgY}`,
       `l_text:${origPriceFont}_${fontSizeOrigPrice}_strikethrough:%24$(origprice),co_rgb:${origPriceColor}`, // Orig Price Layer
-      `fl_layer_apply,g_${origPriceGravity},x_${origPriceX},y_${origPriceY}`,
-      ...origPriceFlags, // Orig Price flags after fl_layer_apply
+      `fl_layer_apply,g_${origPriceGravity},x_${origPriceX},y_${origPriceY}${origPriceFlags.length > 0 ? ',' + origPriceFlags.join(',') : ''}`, // Orig Price flags in same part as fl_layer_apply
       `l_text:${priceFont}_${fontSizePrice}_bold:%24$(price),co_rgb:${priceColor}`, // Price Layer
-      `fl_layer_apply,g_${priceGravity},x_${priceX},y_${priceY}`,
-      ...priceFlags // Price flags after fl_layer_apply
+      `fl_layer_apply,g_${priceGravity},x_${priceX},y_${priceY}${priceFlags.length > 0 ? ',' + priceFlags.join(',') : ''}`, // Price flags in same part as fl_layer_apply
     ]
 
     const transformString = transformParts.join('/')
@@ -873,9 +923,9 @@ function DesignPlayground() {
     if (key === 'color') return 'color'
     if (key === 'gravity') return 'gravity'
     if (key === 'font') return 'font'
-    if (key === 'flNoOverflow' || key === 'flTextDisallowOverflow') return 'boolean'
+    if (key === 'flNoOverflow' || key === 'flTextDisallowOverflow' || key === 'textWrap') return 'boolean'
     if (key === 'fontSize') return 'fontSize' // Special type for fontSize (text input with validation)
-    if (key === 'width' || key === 'height' || key === 'x' || key === 'y') return 'number'
+    if (key === 'textWidth' || key === 'width' || key === 'height' || key === 'x' || key === 'y') return 'number'
     return 'text'
   }
 
@@ -904,13 +954,13 @@ function DesignPlayground() {
     if (propertyKey === 'width' || propertyKey === 'Height' || propertyKey === 'Width') {
       return false
     }
-    // Style properties (color, font, flags) are inherited if inheritStyles is ON
-    const styleProperties = ['color', 'font', 'flNoOverflow', 'flTextDisallowOverflow']
+    // Style properties (color, font, flags, textWrap) are inherited if inheritStyles is ON
+    const styleProperties = ['color', 'font', 'flNoOverflow', 'flTextDisallowOverflow', 'textWrap']
     if (styleProperties.includes(propertyKey)) {
       return inheritanceToggles.inheritStyles
     }
-    // Position/size properties (x, y, fontSize, gravity) are inherited if inheritAll is ON
-    const positionSizeProperties = ['x', 'y', 'fontSize', 'gravity']
+    // Position/size properties (x, y, fontSize, gravity, textWidth) are inherited if inheritAll is ON
+    const positionSizeProperties = ['x', 'y', 'fontSize', 'gravity', 'textWidth']
     if (positionSizeProperties.includes(propertyKey)) {
       return inheritanceToggles.inheritAll
     }
@@ -1034,9 +1084,12 @@ function DesignPlayground() {
           } else if (key === 'gravity' || key === 'font' || key === 'color') {
             // String values: gravity, font, color
             convertedValue = value
-          } else if (key === 'flNoOverflow' || key === 'flTextDisallowOverflow') {
+          } else if (key === 'flNoOverflow' || key === 'flTextDisallowOverflow' || key === 'textWrap') {
             // Boolean values: convert string to boolean
             convertedValue = value === true || value === 'true' || value === '1'
+          } else if (key === 'textWidth') {
+            // textWidth: number value
+            convertedValue = parseInt(value) || 0
           }
           
           newRules[designId][layerKey][key] = convertedValue
@@ -2253,6 +2306,39 @@ function DesignPlayground() {
                   </div>
                 </div>
               </div>
+              
+              <div className="control-group">
+                <div className="label-row">
+                  <label>Text Wrap</label>
+                  {(() => {
+                    const isInherited = isPropertyInherited('Layers', 'Title', 'textWrap')
+                    const isOverridden = isPropertyOverriddenForDisplay('Layers', 'Title', 'textWrap')
+                    const wouldBeInherited = wouldPropertyBeInherited('Layers', 'Title', 'textWrap')
+                    const showIcon = isInherited || (isOverridden && wouldBeInherited)
+                    return showIcon ? (
+                      <svg 
+                        width="14" 
+                        height="14" 
+                        viewBox="0 0 24 24" 
+                        fill="none" 
+                        stroke={isInherited ? "var(--active-color)" : "#888"} 
+                        strokeWidth="2" 
+                        style={{ opacity: isInherited ? 0.7 : 0.4 }} 
+                        title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
+                      >
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                        <path d="M2 17l10 5 10-5"></path>
+                        <path d="M2 12l10 5 10-5"></path>
+                      </svg>
+                    ) : null
+                  })()}
+                </div>
+                <div className="toggle-wrapper" onClick={() => handleRuleUpdate('Layers', 'Title', 'textWrap', !(editableRules[selectedDesign.id]?.title?.textWrap !== false))}>
+                  <div className={`toggle-track ${editableRules[selectedDesign.id]?.title?.textWrap !== false ? 'active' : ''}`}>
+                    <div className="toggle-thumb"></div>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Tagline Font */}
@@ -2389,6 +2475,39 @@ function DesignPlayground() {
                 </div>
                 <div className="toggle-wrapper" onClick={() => handleRuleUpdate('Layers', 'Tagline', 'flTextDisallowOverflow', !(editableRules[selectedDesign.id]?.tagline?.flTextDisallowOverflow || false))}>
                   <div className={`toggle-track ${editableRules[selectedDesign.id]?.tagline?.flTextDisallowOverflow ? 'active' : ''}`}>
+                    <div className="toggle-thumb"></div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="control-group">
+                <div className="label-row">
+                  <label>Text Wrap</label>
+                  {(() => {
+                    const isInherited = isPropertyInherited('Layers', 'Tagline', 'textWrap')
+                    const isOverridden = isPropertyOverriddenForDisplay('Layers', 'Tagline', 'textWrap')
+                    const wouldBeInherited = wouldPropertyBeInherited('Layers', 'Tagline', 'textWrap')
+                    const showIcon = isInherited || (isOverridden && wouldBeInherited)
+                    return showIcon ? (
+                      <svg 
+                        width="14" 
+                        height="14" 
+                        viewBox="0 0 24 24" 
+                        fill="none" 
+                        stroke={isInherited ? "var(--active-color)" : "#888"} 
+                        strokeWidth="2" 
+                        style={{ opacity: isInherited ? 0.7 : 0.4 }} 
+                        title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
+                      >
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                        <path d="M2 17l10 5 10-5"></path>
+                        <path d="M2 12l10 5 10-5"></path>
+                      </svg>
+                    ) : null
+                  })()}
+                </div>
+                <div className="toggle-wrapper" onClick={() => handleRuleUpdate('Layers', 'Tagline', 'textWrap', !(editableRules[selectedDesign.id]?.tagline?.textWrap !== false))}>
+                  <div className={`toggle-track ${editableRules[selectedDesign.id]?.tagline?.textWrap !== false ? 'active' : ''}`}>
                     <div className="toggle-thumb"></div>
                   </div>
                 </div>
