@@ -87,36 +87,87 @@ export const DESIGN_RULES = {
     height: 900,
     showLogo: true,
     logoPublicId: 'create/shoes/shoe-logo-small',
-    logo: { width: 100, height: 100, x: 10, y: 0, gravity: GRAVITY_VALUES.northEast },
-    title: { x: 20, y: 70, gravity: GRAVITY_VALUES.northWest, fontSize: 32, color: '#ffffff', font: 'Arial', flNoOverflow: true, flTextDisallowOverflow: false, textWrap: true, textWidth: 400 },
-    tagline: { x: 30, y: 120, gravity: GRAVITY_VALUES.northEast, fontSize: 20, color: '#ffffff', font: 'Arial', flNoOverflow: true, flTextDisallowOverflow: false, textWrap: true, textWidth: 400 },
-    image: { width: 300, height: 300, x: 10, y: 30, gravity: GRAVITY_VALUES.southEast },
-    origPrice: { x: 30, y: 40, gravity: GRAVITY_VALUES.southWest, fontSize: 30, color: '#bbbbbb', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false },
-    price: { x: 130, y: 40, gravity: GRAVITY_VALUES.southWest, fontSize: 44, color: '#ffffff', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false }
+    logo: { width: 100, height: 100, x: 10, y: 0, gravity: GRAVITY_VALUES.northEast, order: 1 },
+    title: { 
+      x: 20, y: 70, gravity: GRAVITY_VALUES.northWest, fontSize: 32, color: '#ffffff', font: 'Arial', 
+      flNoOverflow: true, flTextDisallowOverflow: false, textWrap: true, textWidth: 400,
+      fieldName: 'title', bold: true, order: 2
+    },
+    tagline: { 
+      x: 30, y: 120, gravity: GRAVITY_VALUES.northEast, fontSize: 20, color: '#ffffff', font: 'Arial', 
+      flNoOverflow: true, flTextDisallowOverflow: false, textWrap: true, textWidth: 400,
+      fieldName: 'tagline', italic: true, order: 3
+    },
+    image: { width: 300, height: 300, x: 10, y: 30, gravity: GRAVITY_VALUES.southEast, order: 4 },
+    origPrice: { 
+      x: 30, y: 40, gravity: GRAVITY_VALUES.southWest, fontSize: 30, color: '#bbbbbb', font: 'Arial', 
+      flNoOverflow: false, flTextDisallowOverflow: false,
+      calculation: { formula: 'mul_1.25', dependsOn: 'price' },
+      strikethrough: true, order: 5
+    },
+    price: { 
+      x: 130, y: 40, gravity: GRAVITY_VALUES.southWest, fontSize: 44, color: '#ffffff', font: 'Arial', 
+      flNoOverflow: false, flTextDisallowOverflow: false,
+      fieldName: 'price', bold: true, prefix: '$', isNumber: true, order: 6
+    }
   },
   'ig-ad': {
     width: 1080,
     height: 1080,
     showLogo: true,
     logoPublicId: 'create/shoes/shoe-logo-small',
-    logo: { width: 100, height: 100,  x: 10, y: 0, gravity: GRAVITY_VALUES.northEast },
-    title: { x: 0, y: 80, gravity: GRAVITY_VALUES.north, fontSize: "110%", color: '#ffffff', font: 'Arial', flNoOverflow: true, flTextDisallowOverflow: false, textWrap: true, textWidth: 864 },
-    tagline: { x: 0, y: 100, gravity: GRAVITY_VALUES.north, fontSize: 20, color: '#ffffff', font: 'Arial', flNoOverflow: true, flTextDisallowOverflow: false, textWrap: true, textWidth: 864 },
-    image: { width: 350, height: 250, x: 0, y: 120, gravity: GRAVITY_VALUES.north },
-    origPrice: { x: -44, y: 60, gravity: GRAVITY_VALUES.south, fontSize: 30, color: '#bbbbbb', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false },
-    price: { x: 0, y: 50, gravity: GRAVITY_VALUES.south, fontSize: 44, color: '#ffffff', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false }
+    logo: { width: 100, height: 100,  x: 10, y: 0, gravity: GRAVITY_VALUES.northEast, order: 1 },
+    title: { 
+      x: 0, y: 80, gravity: GRAVITY_VALUES.north, fontSize: "110%", color: '#ffffff', font: 'Arial', 
+      flNoOverflow: true, flTextDisallowOverflow: false, textWrap: true, textWidth: 864,
+      fieldName: 'title', bold: true, order: 2
+    },
+    tagline: { 
+      x: 0, y: 100, gravity: GRAVITY_VALUES.north, fontSize: 20, color: '#ffffff', font: 'Arial', 
+      flNoOverflow: true, flTextDisallowOverflow: false, textWrap: true, textWidth: 864,
+      fieldName: 'tagline', italic: true, order: 3
+    },
+    image: { width: 350, height: 250, x: 0, y: 120, gravity: GRAVITY_VALUES.north, order: 4 },
+    origPrice: { 
+      x: -44, y: 60, gravity: GRAVITY_VALUES.south, fontSize: 30, color: '#bbbbbb', font: 'Arial', 
+      flNoOverflow: false, flTextDisallowOverflow: false,
+      calculation: { formula: 'mul_1.25', dependsOn: 'price' },
+      strikethrough: true, order: 5
+    },
+    price: { 
+      x: 0, y: 50, gravity: GRAVITY_VALUES.south, fontSize: 44, color: '#ffffff', font: 'Arial', 
+      flNoOverflow: false, flTextDisallowOverflow: false,
+      fieldName: 'price', bold: true, prefix: '$', isNumber: true, order: 6
+    }
   },
   'fb-mobile': {
     width: 1080,
     height: 1350,
     showLogo: true,
     logoPublicId: 'create/shoes/shoe-logo-small',
-    logo: { width: 100, height: 100, x: 10, y: 0, gravity: GRAVITY_VALUES.northEast },
-    title: { x: 0, y: 30, gravity: GRAVITY_VALUES.north, fontSize: 32, color: '#ffffff', font: 'Arial', flNoOverflow: true, flTextDisallowOverflow: false, textWrap: true, textWidth: 864 },
-    tagline: { x: 0, y: 60, gravity: GRAVITY_VALUES.south, fontSize: 20, color: '#ffffff', font: 'Arial', flNoOverflow: true, flTextDisallowOverflow: false, textWrap: true, textWidth: 864 },
-    image: { width: 380, height: 280, x: 0, y: 60, gravity: GRAVITY_VALUES.center },
-    origPrice: { x: 0, y: -140, gravity: GRAVITY_VALUES.center, fontSize: "120%", color: '#bbbbbb', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false },
-    price: { x: 0, y: -120, gravity: GRAVITY_VALUES.center, fontSize: "150%", color: '#ffffff', font: 'Arial', flNoOverflow: false, flTextDisallowOverflow: false }
+    logo: { width: 100, height: 100, x: 10, y: 0, gravity: GRAVITY_VALUES.northEast, order: 1 },
+    title: { 
+      x: 0, y: 30, gravity: GRAVITY_VALUES.north, fontSize: 32, color: '#ffffff', font: 'Arial', 
+      flNoOverflow: true, flTextDisallowOverflow: false, textWrap: true, textWidth: 864,
+      fieldName: 'title', bold: true, order: 2
+    },
+    tagline: { 
+      x: 0, y: 60, gravity: GRAVITY_VALUES.south, fontSize: 20, color: '#ffffff', font: 'Arial', 
+      flNoOverflow: true, flTextDisallowOverflow: false, textWrap: true, textWidth: 864,
+      fieldName: 'tagline', italic: true, order: 3
+    },
+    image: { width: 380, height: 280, x: 0, y: 60, gravity: GRAVITY_VALUES.center, order: 4 },
+    origPrice: { 
+      x: 0, y: -140, gravity: GRAVITY_VALUES.center, fontSize: "120%", color: '#bbbbbb', font: 'Arial', 
+      flNoOverflow: false, flTextDisallowOverflow: false,
+      calculation: { formula: 'mul_1.25', dependsOn: 'price' },
+      strikethrough: true, order: 5
+    },
+    price: { 
+      x: 0, y: -120, gravity: GRAVITY_VALUES.center, fontSize: "150%", color: '#ffffff', font: 'Arial', 
+      flNoOverflow: false, flTextDisallowOverflow: false,
+      fieldName: 'price', bold: true, prefix: '$', isNumber: true, order: 6
+    }
   }
 }
 

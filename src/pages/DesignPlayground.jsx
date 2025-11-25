@@ -8,22 +8,21 @@ import Preview from './playground/Preview'
 import Controls from './playground/Controls'
 import TextualPreview from './playground/TextualPreview'
 import { parseUrlSegments as parseUrlSegmentsUtil, generateLayerConfig, extractLayersFromRules } from '../utils/urlParser'
-import { calculateFontSize, fontToKebabCase, buildTextFlags } from '../utils/fontUtils'
-import { hexToRgb } from '../utils/colorUtils'
 import { extractMetadataId, hasMetadataSyntax, getMetadataKey } from '../utils/metadataUtils'
 import { escapeCloudinaryString, getDefaultValue, shouldUseMetadata, getMetaKeyForField, getBackgroundColorValue } from '../utils/cloudinaryUtils'
+import { buildCloudinaryTransform } from '../utils/cloudinaryTransformBuilder'
 
 function DesignPlayground() {
   const [selectedAsset, setSelectedAsset] = useState(() => {
     const saved = localStorage.getItem('playground_asset')
     return saved ? ASSETS.find(a => a.id === saved) || ASSETS[2] : ASSETS[2]
   })
-  
+
   const [selectedDesign, setSelectedDesign] = useState(() => {
     const saved = localStorage.getItem('playground_design')
     return saved ? DESIGN_TYPES.find(d => d.id === saved) || DESIGN_TYPES[0] : DESIGN_TYPES[0]
   })
-  
+
   const [formValues, setFormValues] = useState(() => {
     const saved = localStorage.getItem('playground_form')
     return saved ? JSON.parse(saved) : {
@@ -50,13 +49,13 @@ function DesignPlayground() {
 
   // Preview tab state (visual or textual)
   const [previewTab, setPreviewTab] = useState('visual')
-  
+
   // Highlighted row state for URL preview interaction
   const [highlightedRow, setHighlightedRow] = useState(null)
-  
+
   // Layer overlay toggle state (default off)
   const [showLayerOverlays, setShowLayerOverlays] = useState(false)
-  
+
   // Ref for preview wrapper to get actual displayed size
   const previewWrapperRef = useRef(null)
 
@@ -71,7 +70,7 @@ function DesignPlayground() {
         Object.keys(DESIGN_RULES).forEach(designId => {
           const designRule = DESIGN_RULES[designId]
           const savedRule = parsed[designId] || {}
-          
+
           // Deep merge layer properties (title, tagline, price, origPrice, image, logo)
           const layerKeys = ['title', 'tagline', 'price', 'origPrice', 'image', 'logo']
           const mergedLayers = {}
@@ -91,7 +90,7 @@ function DesignPlayground() {
               }
             }
           })
-          
+
           merged[designId] = {
             ...designRule,
             ...savedRule,
@@ -101,49 +100,55 @@ function DesignPlayground() {
             logoPublicId: savedRule.logoPublicId || designRule.logoPublicId || 'create/shoes/shoe-logo-small'
           }
         })
-        // Ensure textWidth defaults for title and tagline in merged rules
+        // Ensure textWidth defaults for text layers with textWrap in merged rules
         Object.keys(merged).forEach(designId => {
           const designRule = merged[designId]
-          if (designRule.title && !designRule.title.textWidth) {
-            designRule.title.textWidth = Math.round((designRule.width || 500) * 0.8)
-          }
-          if (designRule.tagline && !designRule.tagline.textWidth) {
-            designRule.tagline.textWidth = Math.round((designRule.width || 500) * 0.8)
-          }
-          if (designRule.title && designRule.title.textWrap === undefined) {
-            designRule.title.textWrap = true
-          }
-          if (designRule.tagline && designRule.tagline.textWrap === undefined) {
-            designRule.tagline.textWrap = true
-          }
+          Object.keys(designRule).forEach(key => {
+            const layer = designRule[key]
+            if (layer && typeof layer === 'object' && 'fontSize' in layer) {
+              // It's a text layer
+              if (layer.textWrap !== false && !layer.textWidth) {
+                layer.textWidth = Math.round((designRule.width || 500) * 0.8)
+              }
+              if (layer.textWrap === undefined) {
+                layer.textWrap = true
+              }
+            }
+          })
         })
         return merged
       } catch (e) {
         // If parsing fails, use DESIGN_RULES
         const defaultRules = JSON.parse(JSON.stringify(DESIGN_RULES))
-        // Ensure textWidth defaults
+        // Ensure textWidth defaults for text layers with textWrap
         Object.keys(defaultRules).forEach(designId => {
           const designRule = defaultRules[designId]
-          if (designRule.title && !designRule.title.textWidth) {
-            designRule.title.textWidth = Math.round((designRule.width || 500) * 0.8)
-          }
-          if (designRule.tagline && !designRule.tagline.textWidth) {
-            designRule.tagline.textWidth = Math.round((designRule.width || 500) * 0.8)
-          }
+          Object.keys(designRule).forEach(key => {
+            const layer = designRule[key]
+            if (layer && typeof layer === 'object' && 'fontSize' in layer) {
+              // It's a text layer
+              if (layer.textWrap !== false && !layer.textWidth) {
+                layer.textWidth = Math.round((designRule.width || 500) * 0.8)
+              }
+            }
+          })
         })
         return defaultRules
       }
     }
     const defaultRules = JSON.parse(JSON.stringify(DESIGN_RULES))
-    // Ensure textWidth defaults
+    // Ensure textWidth defaults for text layers with textWrap
     Object.keys(defaultRules).forEach(designId => {
       const designRule = defaultRules[designId]
-      if (designRule.title && !designRule.title.textWidth) {
-        designRule.title.textWidth = Math.round((designRule.width || 500) * 0.8)
-      }
-      if (designRule.tagline && !designRule.tagline.textWidth) {
-        designRule.tagline.textWidth = Math.round((designRule.width || 500) * 0.8)
-      }
+      Object.keys(designRule).forEach(key => {
+        const layer = designRule[key]
+        if (layer && typeof layer === 'object' && 'fontSize' in layer) {
+          // It's a text layer
+          if (layer.textWrap !== false && !layer.textWidth) {
+            layer.textWidth = Math.round((designRule.width || 500) * 0.8)
+          }
+        }
+      })
     })
     return defaultRules
   })
@@ -246,10 +251,10 @@ function DesignPlayground() {
       price: '{pprice}',
       backgroundColor: '{pbackgroundcolor}'
     }
-    
+
     const updates = {}
     let needsUpdate = false
-    
+
     Object.keys(metaFields).forEach(field => {
       if (useMetadata[field]) {
         const currentValue = formValues[field]
@@ -261,7 +266,7 @@ function DesignPlayground() {
         }
       }
     })
-    
+
     if (needsUpdate) {
       setFormValues(prev => ({ ...prev, ...updates }))
     }
@@ -271,15 +276,15 @@ function DesignPlayground() {
   useEffect(() => {
     const syncUpdates = {}
     let needsSync = false
-    
+
     Object.keys(formValues).forEach(field => {
       const hasMetadata = hasMetadataSyntax(formValues[field])
       const currentToggleState = useMetadata[field]
-      
+
       if (hasMetadata !== currentToggleState) {
         syncUpdates[field] = hasMetadata
         needsSync = true
-        
+
         // If formValue has {metadata} but toggle is off, save the non-metadata part
         if (hasMetadata && !currentToggleState && savedValues[field] === null) {
           const cleaned = formValues[field].replace(/\{[^}]+\}/g, '').trim()
@@ -290,7 +295,7 @@ function DesignPlayground() {
         }
       }
     })
-    
+
     if (needsSync) {
       setUseMetadata(prev => ({
         ...prev,
@@ -311,7 +316,7 @@ function DesignPlayground() {
   const [currentImageUrl, setCurrentImageUrl] = useState('')
   // Track if this is the initial load (don't show toast on initial load)
   const isInitialLoad = useRef(true)
-  
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedValues(formValues)
@@ -320,273 +325,67 @@ function DesignPlayground() {
     return () => clearTimeout(timer)
   }, [formValues, useMetadata])
 
-  const getTransformedUrl = () => {
-    const scale = selectedDesign.width / BASE_WIDTH
-    const s = (val) => Math.round(val * scale)
-    
-    
-    // Determine values based on toggles
-    // If toggle is ON: use Cloudinary conditional logic to check metadata
-    // We construct the variable value to include the logic:
-    // e.g. $title_ctx:!PTitle!/if_!title!_eq_!empty!/Then set to default
-    // Cloudinary doesn't support "set variable to A, if empty set to B" easily in one line without `if`.
-    // But variables allow: $title_ctx:!PTitle!
-    // And then we can use: l_text:style:$(title)
-    // However, if PTitle is empty, $(title) might be empty string or cause error?
-    // Actually, if context key is missing, it might be empty.
-    // Better approach: use user-defined variable for the default value too, e.g. $default_title_!Demo!
-    // Then logic: $title_ctx:!PTitle!/if_!title!_eq_!empty!/$title_$default_title/if_end
-    
-    // Let's construct the parts.
-    
-    // Metadata Keys:
-    // title -> PTitle (context or metadata? Prompt says "metadata value", but "PTitle" usually context. Let's try context `ctx:`)
-    // tagline -> PDescription
-    // price -> PPrice
-    
-    // Note: Cloudinary context keys are usually user defined. 'PTitle' suggests 'Product Title'.
-    // We will assume they are Context keys 'ctx:PTitle'. If they are structured metadata, it would be 'md:key_id'.
-    // Given the simple names, context is more likely or simpler.
-    
-    // Defaults
-    // Check if formValues contain {metadata} syntax - if so, treat as metadata usage
-    // When toggle is on OR value contains {metadata}, use savedValues as default (not the metadata syntax string)
-    // When toggle is off and no {metadata}, use formValues directly
-    const defaultTitle = escapeCloudinaryString(getDefaultValue('title', debouncedValues, debouncedUseMetadata, savedValues))
-    const defaultTagline = escapeCloudinaryString(getDefaultValue('tagline', debouncedValues, debouncedUseMetadata, savedValues))
-    const defaultPrice = getDefaultValue('price', debouncedValues, debouncedUseMetadata, savedValues) // Number, no escape needed usually
-    
-    const defaultBackgroundColor = getBackgroundColorValue(debouncedValues, debouncedUseMetadata, savedValues)
+  // Helper to build the logic for one field
+  const buildFieldLogicLocal = (varName, metaKey, defaultValue, isNumber = false) => {
+    // Format default value
+    const safeDefault = (defaultValue && String(defaultValue).trim() !== '')
+      ? defaultValue
+      : (isNumber ? 0 : ' ')
 
-    // Construct variable definitions
-    // We will define the "final" variables used in layers: $title, $tagline, $price, $bgcolor
-    
-    // Helper to build the logic for one field
-    const buildFieldLogicLocal = (varName, metaKey, defaultValue, isNumber = false) => {
-      // Format default value
-      const safeDefault = (defaultValue && String(defaultValue).trim() !== '') 
-          ? defaultValue 
-          : (isNumber ? 0 : ' ')
-      
-      const defaultValFormatted = isNumber ? safeDefault : `!${safeDefault}!`
-      
-      // Check if we should use metadata (either toggle is on, or value contains {metadata})
-      const useMeta = shouldUseMetadata(varName, debouncedValues, debouncedUseMetadata)
-      
-      if (!useMeta) {
-        return `$${varName}_${defaultValFormatted}`
-      } else {
-        // Init-Default-Override Pattern
-        // This ensures the variable is never empty/undefined, avoiding "Must specify text" errors.
-        const parts = []
-        // Use unique simple temp variable names to avoid parsing issues with underscores
-        const tempVarMap = { title: 'tt', tagline: 'tg', price: 'tp', backgroundColor: 'tb' }
-        const tempVar = tempVarMap[varName] || `t${varName.charAt(0)}`
-        
-        // 1. Initialize variable with Default Value first
-        parts.push(`$${varName}_${defaultValFormatted}`)
-        
-        // 2. Fetch metadata into a temporary variable
-        // Using 'md:!external_id!' for structured metadata (not ctx:)
-        // The external_id should match the structured metadata field's external ID
-        parts.push(`$${tempVar}_md:!${metaKey}!`)
-        
-        // 3. If temp variable is NOT empty, override the main variable
-        // 'ne_!!' checks for not equal to empty string
-        parts.push(`if_!${tempVar}!_ne_!!`)
-        // Copy temp variable to main variable
-        // Variables should be assigned directly, not wrapped in !...! (that's only for literal text)
-        parts.push(`$${varName}_$${tempVar}`)
-        parts.push(`if_end`)
-        
-        return parts.join('/')
-      }
-    }
+    const defaultValFormatted = isNumber ? safeDefault : `!${safeDefault}!`
 
-    // Variable definitions
-    // Get metadata keys - either from {metadata} syntax in formValues or from default mapping
-    const titleMetaKey = getMetaKeyForField('title', debouncedValues)
-    const taglineMetaKey = getMetaKeyForField('tagline', debouncedValues)
-    const priceMetaKey = getMetaKeyForField('price', debouncedValues)
-    
-    const titleVarDef = buildFieldLogicLocal('title', titleMetaKey, defaultTitle)
-    const taglineVarDef = buildFieldLogicLocal('tagline', taglineMetaKey, defaultTagline)
-    
-    // Price is special because of math: $origprice_$price_mul_1.25
-    // If we use metadata, we need to ensure it works with math.
-    // If we load price as string, math might fail.
-    // However, the layers use: `l_text:Arial...:$(price)` which works with string or number.
-    // But `$origprice` calculation needs `$price` to be a number.
-    // We can force it: `$price_ctx:!PPrice!/to_n` ? No explicit cast needed usually if it looks like number.
-    // Let's try basic replacement.
-    const priceVarDef = buildFieldLogicLocal('price', priceMetaKey, defaultPrice, true)
-    
-    // Background color: needs special handling for RGB format
-    // According to Cloudinary docs: For RGB hex values, use syntax $var_!rgb:######!
-    // Then use it as b_$var (not b_rgb:$var)
-    // The variable should contain the full "rgb:000428" value
-    const backgroundColorMetaKey = getMetaKeyForField('backgroundColor', debouncedValues)
-    const bgColorUseMeta = shouldUseMetadata('backgroundColor', debouncedValues, debouncedUseMetadata)
-    let bgColorVarDef = ''
-    if (!bgColorUseMeta) {
-      // Direct value: use the format $bgcolor_!rgb:000428!
-      bgColorVarDef = `$bgcolor_!rgb:${defaultBackgroundColor}!`
+    // Check if we should use metadata (either toggle is on, or value contains {metadata})
+    const useMeta = shouldUseMetadata(varName, debouncedValues, debouncedUseMetadata)
+
+    if (!useMeta) {
+      return `$${varName}_${defaultValFormatted}`
     } else {
-      // With metadata: initialize with default, then override if metadata exists
-      // Note: We can't interpolate variables inside !...! wrapper
-      // Solution: Construct rgb: format using a workaround
-      // Since metadata might return hex (like "c32222" or "#c32222"), we need to handle it
-      // Approach: Use the metadata value and try to construct the rgb: format
-      // We'll use a helper variable to store the hex, then construct rgb: format
-      // But since we can't concatenate strings, we need a different approach
-      // Actually, the best solution: Use conditional logic to handle both cases
-      // If metadata returns "rgb:HEX", use it directly
-      // If metadata returns just hex, we need to construct it - but that's not possible
-      // So we'll assume metadata returns the full "rgb:HEX" format
-      // If it doesn't, the metadata field needs to be configured to return that format
+      // Init-Default-Override Pattern
+      // This ensures the variable is never empty/undefined, avoiding "Must specify text" errors.
       const parts = []
-      // Initialize with default value in rgb: format
-      parts.push(`$bgcolor_!rgb:${defaultBackgroundColor}!`)
-      // Fetch metadata - metadata should return "rgb:HEX" format for this to work
-      // If metadata returns just hex, we can't construct "rgb:HEX" easily
-      parts.push(`$tb_md:!${backgroundColorMetaKey}!`)
-      parts.push(`if_!tb!_ne_!!`)
-      // Assign the metadata value directly
-      // This works if metadata returns "rgb:HEX" format
-      // If metadata returns just hex (like "c32222"), this won't work correctly
-      // The metadata field should be configured to return "rgb:HEX" format
-      parts.push(`$bgcolor_$tb`)
-      parts.push(`if_end`)
-      bgColorVarDef = parts.join('/')
-    }
+      // Use unique simple temp variable names to avoid parsing issues with underscores
+      const tempVarMap = { title: 'tt', tagline: 'tg', price: 'tp', backgroundColor: 'tb' }
+      const tempVar = tempVarMap[varName] || `t${varName.charAt(0)}`
 
-    
-    // Variable definition block
-    // Note: We need to handle the public ID in $img variable.
-    // Standard practice: use !...! for strings containing special chars if needed.
-    // Public IDs can have slashes. Cloudinary variables cannot have slashes.
-    // Replace slashes with colons for use in variables/layers
-    const publicIdClean = selectedAsset.publicId.replace(/\//g, ':')
-    const imgVar = `!${publicIdClean}!`
-    
+      // 1. Initialize variable with Default Value first
+      parts.push(`$${varName}_${defaultValFormatted}`)
+
+      // 2. Fetch metadata into a temporary variable
+      // Using 'md:!external_id!' for structured metadata (not ctx:)
+      // The external_id should match the structured metadata field's external ID
+      parts.push(`$${tempVar}_md:!${metaKey}!`)
+
+      // 3. If temp variable is NOT empty, override the main variable
+      // 'ne_!!' checks for not equal to empty string
+      parts.push(`if_!${tempVar}!_ne_!!`)
+      // Copy temp variable to main variable
+      // Variables should be assigned directly, not wrapped in !...! (that's only for literal text)
+      parts.push(`$${varName}_$${tempVar}`)
+      parts.push(`if_end`)
+
+      return parts.join('/')
+    }
+  }
+
+  const getTransformedUrl = () => {
     // Get positioning rules for the selected design type (use editable rules)
     const rules = editableRules[selectedDesign.id] || editableRules['parent']
-    
-    // Use canvas dimensions from state (editable) or fallback to rules
-    const padW = canvasDimensions.width || rules.width
-    const padH = canvasDimensions.height || rules.height
-    
-    // Logo properties
-    const showLogo = rules.showLogo !== false // Default to true
-    const logoPublicId = rules.logoPublicId || 'create/shoes/shoe-logo-small'
-    const logoRules = rules.logo || { width: 100, height: 100, x: 0, y: 0, gravity: GRAVITY_VALUES.northWest }
-    
-    // Logo positioning - scale if needed
-    const logoW = s(logoRules.width)
-    const logoH = s(logoRules.height)
-    const logoX = s(logoRules.x)
-    const logoY = s(logoRules.y)
-    const logoGravity = logoRules.gravity || GRAVITY_VALUES.northWest
-    
-    // Clean logo public ID for use in layer (replace slashes with colons)
-    const logoPublicIdClean = logoPublicId.replace(/\//g, ':')
-    
-    // Extract colors from rules and convert to RGB format for Cloudinary
-    const titleColor = hexToRgb(rules.title.color || '#ffffff')
-    const taglineColor = hexToRgb(rules.tagline.color || '#ffffff')
-    const priceColor = hexToRgb(rules.price.color || '#ffffff')
-    const origPriceColor = hexToRgb(rules.origPrice.color || '#bbbbbb')
-    
-    // Calculate font sizes with percentage support
-    // Title is the base (parent) for percentage calculations - use unscaled base value
-    const baseTitleSize = typeof rules.title.fontSize === 'string' && rules.title.fontSize.endsWith('%')
-      ? 32 // Default base if title itself is percentage (shouldn't happen, but fallback)
-      : rules.title.fontSize
-    
-    // Calculate title font size (not scaled - font sizes remain absolute)
-    const fontSizeTitle = calculateFontSize(rules.title.fontSize, baseTitleSize)
-    
-    // Calculate other font sizes relative to title's base value (not scaled)
-    const fontSizeTagline = calculateFontSize(rules.tagline.fontSize, baseTitleSize)
-    const fontSizePrice = calculateFontSize(rules.price.fontSize, baseTitleSize)
-    const fontSizeOrigPrice = calculateFontSize(rules.origPrice.fontSize, baseTitleSize)
-    
-    // Apply rules with scaling
-    const titleX = s(rules.title.x)
-    const titleY = s(rules.title.y)
-    const titleGravity = rules.title.gravity
-    
-    const taglineX = s(rules.tagline.x)
-    const taglineY = s(rules.tagline.y)
-    const taglineGravity = rules.tagline.gravity
-    
-    const imgW = s(rules.image.width)
-    const imgH = s(rules.image.height)
-    const imgX = s(rules.image.x)
-    const imgY = s(rules.image.y)
-    const imgGravity = rules.image.gravity
-    
-    const origPriceX = s(rules.origPrice.x)
-    const origPriceY = s(rules.origPrice.y)
-    const origPriceGravity = rules.origPrice.gravity
-    
-    const priceX = s(rules.price.x)
-    const priceY = s(rules.price.y)
-    const priceGravity = rules.price.gravity
 
-    // Get layer-specific fonts and format for Cloudinary (convert to kebab-case)
-    const titleFont = fontToKebabCase(rules.title.font || 'Arial')
-    const taglineFont = fontToKebabCase(rules.tagline.font || 'Arial')
-    const origPriceFont = fontToKebabCase(rules.origPrice.font || 'Arial')
-    const priceFont = fontToKebabCase(rules.price.font || 'Arial')
-
-    // Build flags for each text layer
-    const titleFlags = buildTextFlags(rules.title)
-    const taglineFlags = buildTextFlags(rules.tagline)
-    const origPriceFlags = buildTextFlags(rules.origPrice)
-    const priceFlags = buildTextFlags(rules.price)
-
-    // Construct transformation
-    
-    const transformParts = [
-      `$img_${imgVar}`,
-      titleVarDef,
-      taglineVarDef,
-      priceVarDef,
-      bgColorVarDef,
-      `$origprice_$price_mul_1.25`, // Logic logic stays same
-      `c_crop,w_1,h_1,g_north_west`, // Base crop
-      `c_pad,w_${padW},h_${padH},b_$bgcolor`, // Canvas
-      // Logo Layer (if enabled)
-      ...(showLogo ? [
-        `l_${logoPublicIdClean}`, // Logo Layer
-        `c_fit,w_${logoW},h_${logoH}`,
-        `fl_layer_apply,g_${logoGravity},x_${logoX},y_${logoY}`
-      ] : []),
-      // Title Layer with optional text wrapping
-      ...(rules.title.textWrap !== false 
-        ? [`c_fit,l_text:${titleFont}_${fontSizeTitle}_bold:$(title),co_rgb:${titleColor},w_${rules.title.textWidth || Math.round(padW * 0.8)}`]
-        : [`l_text:${titleFont}_${fontSizeTitle}_bold:$(title),co_rgb:${titleColor}`]
-      ), // Title Layer
-      `fl_layer_apply,g_${titleGravity},x_${titleX},y_${titleY}${titleFlags.length > 0 ? ',' + titleFlags.join(',') : ''}`, // Title flags in same part as fl_layer_apply
-      // Tagline Layer with optional text wrapping
-      ...(rules.tagline.textWrap !== false 
-        ? [`c_fit,l_text:${taglineFont}_${fontSizeTagline}_italic:$(tagline),co_rgb:${taglineColor},w_${rules.tagline.textWidth || Math.round(padW * 0.8)}`]
-        : [`l_text:${taglineFont}_${fontSizeTagline}_italic:$(tagline),co_rgb:${taglineColor}`]
-      ), // Tagline Layer
-      `fl_layer_apply,g_${taglineGravity},x_${taglineX},y_${taglineY}${taglineFlags.length > 0 ? ',' + taglineFlags.join(',') : ''}`, // Tagline flags in same part as fl_layer_apply
-      `l_$img`, // Image Layer
-      `c_fit,w_${imgW},h_${imgH}`,
-      `fl_layer_apply,g_${imgGravity},x_${imgX},y_${imgY}`,
-      `l_text:${origPriceFont}_${fontSizeOrigPrice}_strikethrough:%24$(origprice),co_rgb:${origPriceColor}`, // Orig Price Layer
-      `fl_layer_apply,g_${origPriceGravity},x_${origPriceX},y_${origPriceY}${origPriceFlags.length > 0 ? ',' + origPriceFlags.join(',') : ''}`, // Orig Price flags in same part as fl_layer_apply
-      `l_text:${priceFont}_${fontSizePrice}_bold:%24$(price),co_rgb:${priceColor}`, // Price Layer
-      `fl_layer_apply,g_${priceGravity},x_${priceX},y_${priceY}${priceFlags.length > 0 ? ',' + priceFlags.join(',') : ''}`, // Price flags in same part as fl_layer_apply
-    ]
-
-    const transformString = transformParts.join('/')
-    
-    return `https://res.cloudinary.com/yoav-cloud/image/upload/${transformString}/${selectedAsset.publicId}.png`
+    return buildCloudinaryTransform({
+      rules,
+      canvasDimensions,
+      formValues: debouncedValues,
+      useMetadata: debouncedUseMetadata,
+      savedValues,
+      selectedAsset,
+      selectedDesign,
+      baseWidth: BASE_WIDTH,
+      getDefaultValue: (fieldName) => getDefaultValue(fieldName, debouncedValues, debouncedUseMetadata, savedValues),
+      shouldUseMetadata,
+      getMetaKeyForField,
+      getBackgroundColorValue: () => getBackgroundColorValue(debouncedValues, debouncedUseMetadata, savedValues),
+      buildFieldLogicLocal
+    })
   }
 
   const generatedUrl = getTransformedUrl()
@@ -623,7 +422,7 @@ function DesignPlayground() {
       setTimeout(() => {
         setHighlightedRow(null)
       }, 2000)
-      
+
       // Scroll to the first row with this key if it exists
       const rowElement = document.querySelector(`[data-row-key="${rowKey}"]`)
       if (rowElement) {
@@ -638,7 +437,7 @@ function DesignPlayground() {
     document.querySelectorAll('[data-row-key].highlighted').forEach(el => {
       el.classList.remove('highlighted')
     })
-    
+
     // Add highlight to matching rows
     if (highlightedRow) {
       document.querySelectorAll(`[data-row-key="${highlightedRow}"]`).forEach(el => {
@@ -705,13 +504,13 @@ function DesignPlayground() {
   // Helper to propagate parent property change to children
   const propagateToChildren = (layerKey, propertyKey, value, newRules) => {
     if (selectedDesign.id !== 'parent') return newRules // Only propagate from parent
-    
+
     const shouldInherit = shouldInheritProperty(propertyKey)
     if (!shouldInherit) return newRules
 
     // Get child design IDs
     const childDesigns = DESIGN_TYPES.filter(d => d.id !== 'parent').map(d => d.id)
-    
+
     childDesigns.forEach(childId => {
       // Only propagate if child doesn't have an override
       if (!isPropertyOverridden(childId, layerKey, propertyKey)) {
@@ -728,14 +527,14 @@ function DesignPlayground() {
         }
       }
     })
-    
+
     return newRules
   }
 
   // Handle fontSize validation and revert (prevent percentage in parent)
   const handleFontSizeValidation = (category, layerName, key, value, previousValue) => {
     const designId = selectedDesign.id
-    
+
     // Check if parent design and value contains percentage
     if (designId === 'parent' && typeof value === 'string' && value.includes('%')) {
       toast.error('Parent design cannot use percentage values for font size')
@@ -745,7 +544,7 @@ function DesignPlayground() {
       }
       return false
     }
-    
+
     return true
   }
 
@@ -754,7 +553,7 @@ function DesignPlayground() {
     setEditableRules(prev => {
       const newRules = JSON.parse(JSON.stringify(prev))
       const designId = selectedDesign.id
-      
+
       if (category === 'General') {
         if (key === 'Width') {
           const widthValue = parseInt(value) || 0
@@ -852,7 +651,7 @@ function DesignPlayground() {
         const layerKey = Object.keys(layerMap).find(
           key => layerMap[key].displayName === layerName
         ) || null
-        
+
         // Update layer property
         if (newRules[designId] && newRules[designId][layerKey]) {
           // Convert value based on type
@@ -877,9 +676,9 @@ function DesignPlayground() {
             // textWidth: number value
             convertedValue = parseInt(value) || 0
           }
-          
+
           newRules[designId][layerKey][key] = convertedValue
-          
+
           // Mark as overridden if child, propagate if parent
           if (designId !== 'parent') {
             setPropertyOverrides(prev => ({
@@ -895,7 +694,7 @@ function DesignPlayground() {
           }
         }
       }
-      
+
       return newRules
     })
   }
@@ -913,19 +712,19 @@ function DesignPlayground() {
   const isPropertyInherited = (category, layerName, key) => {
     const designId = selectedDesign.id
     if (designId === 'parent') return false // Parent doesn't inherit
-    
+
     const layerKey = category === 'General' ? '_general' : getLayerKey(layerName)
     if (!layerKey) return false
-    
+
     // Normalize key for General properties (Width/Height -> width/height)
-    const normalizedKey = category === 'General' && (key === 'Width' || key === 'Height') 
-      ? key.toLowerCase() 
+    const normalizedKey = category === 'General' && (key === 'Width' || key === 'Height')
+      ? key.toLowerCase()
       : key
-    
+
     // Check if property is overridden
     const isOverridden = isPropertyOverridden(designId, layerKey, normalizedKey)
     if (isOverridden) return false
-    
+
     // Check if property should be inherited
     return shouldInheritProperty(normalizedKey)
   }
@@ -934,15 +733,15 @@ function DesignPlayground() {
   const wouldPropertyBeInherited = (category, layerName, key) => {
     const designId = selectedDesign.id
     if (designId === 'parent') return false // Parent doesn't inherit
-    
+
     const layerKey = category === 'General' ? '_general' : getLayerKey(layerName)
     if (!layerKey) return false
-    
+
     // Normalize key for General properties (Width/Height -> width/height)
-    const normalizedKey = category === 'General' && (key === 'Width' || key === 'Height') 
-      ? key.toLowerCase() 
+    const normalizedKey = category === 'General' && (key === 'Width' || key === 'Height')
+      ? key.toLowerCase()
       : key
-    
+
     // Check if property should be inherited (regardless of override status)
     return shouldInheritProperty(normalizedKey)
   }
@@ -951,15 +750,15 @@ function DesignPlayground() {
   const isPropertyOverriddenForDisplay = (category, layerName, key) => {
     const designId = selectedDesign.id
     if (designId === 'parent') return false // Parent doesn't have overrides
-    
+
     const layerKey = category === 'General' ? '_general' : getLayerKey(layerName)
     if (!layerKey) return false
-    
+
     // Normalize key for General properties (Width/Height -> width/height)
-    const normalizedKey = category === 'General' && (key === 'Width' || key === 'Height') 
-      ? key.toLowerCase() 
+    const normalizedKey = category === 'General' && (key === 'Width' || key === 'Height')
+      ? key.toLowerCase()
       : key
-    
+
     return isPropertyOverridden(designId, layerKey, normalizedKey)
   }
 
@@ -967,9 +766,9 @@ function DesignPlayground() {
   const handleResetProperty = (category, layerName, key) => {
     const designId = selectedDesign.id
     if (designId === 'parent') return // Can't reset parent
-    
+
     const layerKey = category === 'General' ? '_general' : getLayerKey(layerName)
-    
+
     // Remove override
     setPropertyOverrides(prev => {
       const newOverrides = JSON.parse(JSON.stringify(prev))
@@ -985,11 +784,11 @@ function DesignPlayground() {
       }
       return newOverrides
     })
-    
+
     // Copy value from parent
     setEditableRules(prev => {
       const newRules = JSON.parse(JSON.stringify(prev))
-      
+
       if (category === 'General') {
         if (key === 'Width' || key === 'Height') {
           const propKey = key.toLowerCase()
@@ -1014,7 +813,7 @@ function DesignPlayground() {
           newRules[designId][layerKey][key] = parentValue
         }
       }
-      
+
       return newRules
     })
   }
@@ -1035,7 +834,7 @@ function DesignPlayground() {
   const handleImageLoad = () => {
     setImageLoading(false)
     setImageError(false)
-    
+
     // Show success toast if this is not the initial load and URL actually changed
     if (!isInitialLoad.current && previousUrlRef.current && previousUrlRef.current !== generatedUrl) {
       toast.success('Preview updated successfully', {
@@ -1043,12 +842,12 @@ function DesignPlayground() {
         icon: '✓'
       })
     }
-    
+
     // Mark that initial load is complete
     if (isInitialLoad.current) {
       isInitialLoad.current = false
     }
-    
+
     setCurrentImageUrl(generatedUrl)
   }
 
@@ -1062,13 +861,13 @@ function DesignPlayground() {
     const { name, value } = e.target
     const hasMetadata = hasMetadataSyntax(value)
     const currentToggleState = useMetadata[name]
-    
+
     // Update form value first
     setFormValues(prev => ({
       ...prev,
       [name]: value
     }))
-    
+
     // Auto-sync toggle state based on {metadata} syntax
     if (hasMetadata !== currentToggleState) {
       // If value contains {metadata} but toggle is off, turn it on
@@ -1101,52 +900,52 @@ function DesignPlayground() {
 
   const handleToggleChange = (field) => {
     const isTurningOn = !useMetadata[field]
-    
+
     if (isTurningOn) {
       // Save current value before turning on
       // If current value already has {metadata}, extract the text part or use saved/default
       const currentValue = formValues[field]
       let valueToSave = currentValue
-      
+
       // If current value contains {metadata}, try to extract the non-metadata part
       if (hasMetadataSyntax(currentValue)) {
         const cleaned = currentValue.replace(/\{[^}]+\}/g, '').trim()
-        valueToSave = cleaned || (field === 'title' ? 'Now on Sale' : 
-                                  field === 'tagline' ? 'Limited Time Offer' : 
-                                  field === 'price' ? '80' :
-                                  field === 'backgroundColor' ? '#000428' : '')
+        valueToSave = cleaned || (field === 'title' ? 'Now on Sale' :
+          field === 'tagline' ? 'Limited Time Offer' :
+            field === 'price' ? '80' :
+              field === 'backgroundColor' ? '#000428' : '')
       }
-      
+
       setSavedValues(prev => ({
         ...prev,
         [field]: valueToSave
       }))
-      
+
       // Set to metadata syntax using {id} format
-      const metaSyntax = field === 'title' ? '{ptitle}' : 
-                        field === 'tagline' ? '{pdescription}' : 
-                        field === 'price' ? '{pprice}' :
-                        field === 'backgroundColor' ? '{pbackgroundcolor}' :
-                        ''
+      const metaSyntax = field === 'title' ? '{ptitle}' :
+        field === 'tagline' ? '{pdescription}' :
+          field === 'price' ? '{pprice}' :
+            field === 'backgroundColor' ? '{pbackgroundcolor}' :
+              ''
       setFormValues(prev => ({
         ...prev,
         [field]: metaSyntax
       }))
     } else {
       // Restore saved value when turning off, or fallback to default
-      const valueToRestore = savedValues[field] !== null 
-        ? savedValues[field] 
-        : (field === 'title' ? 'Now on Sale' : 
-           field === 'tagline' ? 'Limited Time Offer' : 
-           field === 'price' ? '80' :
-           field === 'backgroundColor' ? '#000428' : '')
-      
+      const valueToRestore = savedValues[field] !== null
+        ? savedValues[field]
+        : (field === 'title' ? 'Now on Sale' :
+          field === 'tagline' ? 'Limited Time Offer' :
+            field === 'price' ? '80' :
+              field === 'backgroundColor' ? '#000428' : '')
+
       setFormValues(prev => ({
         ...prev,
         [field]: valueToRestore
       }))
     }
-    
+
     setUseMetadata(prev => ({
       ...prev,
       [field]: !prev[field]
@@ -1168,7 +967,7 @@ function DesignPlayground() {
 
   return (
     <div className="playground-container">
-      <PlaygroundHeader 
+      <PlaygroundHeader
         selectedAsset={selectedAsset}
         onAssetChange={setSelectedAsset}
       />
@@ -1232,8 +1031,8 @@ function DesignPlayground() {
           isPropertyOverriddenForDisplay={isPropertyOverriddenForDisplay}
           wouldPropertyBeInherited={wouldPropertyBeInherited}
         />
-                      </div>
-                      </div>
+      </div>
+    </div>
   )
 }
 
