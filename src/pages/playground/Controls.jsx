@@ -134,64 +134,78 @@ export default function Controls({
     }
   }, [highlightedField, highlightedLayer])
 
-  // Helper to render inheritance icon
+  // Helper to render inheritance icon and reset button together
   const renderInheritanceIcon = (layerName, propertyKey) => {
     const isInherited = isPropertyInherited('Layers', layerName, propertyKey)
     const isOverridden = isPropertyOverriddenForDisplay('Layers', layerName, propertyKey)
     const wouldBeInherited = wouldPropertyBeInherited('Layers', layerName, propertyKey)
     const showIcon = isInherited || (isOverridden && wouldBeInherited)
     
-    if (!showIcon) return null
-    
     return (
-      <svg 
-        width="14" 
-        height="14" 
-        viewBox="0 0 24 24" 
-        fill="none" 
-        stroke={isInherited ? "var(--active-color)" : "#888"} 
-        strokeWidth="2" 
-        style={{ opacity: isInherited ? 0.7 : 0.4 }} 
-        title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
-      >
-        <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-        <path d="M2 17l10 5 10-5"></path>
-        <path d="M2 12l10 5 10-5"></path>
-      </svg>
-    )
-  }
-
-  // Helper to render reset button
-  const renderResetButton = (layerName, propertyKey) => {
-    if (!isPropertyOverriddenForDisplay('Layers', layerName, propertyKey)) return null
-    
-    return (
-      <button
-        className="reset-property-btn"
-        onClick={() => handleResetProperty('Layers', layerName, propertyKey)}
-        title="Reset to inherited value"
-        style={{
-          padding: '0.25rem 0.5rem',
-          fontSize: '0.75rem',
-          backgroundColor: 'transparent',
-          border: '1px solid #555',
-          borderRadius: '4px',
-          color: '#aaa',
-          cursor: 'pointer',
-          transition: 'all 0.2s',
-          whiteSpace: 'nowrap'
-        }}
-        onMouseEnter={(e) => {
-          e.target.style.borderColor = 'var(--active-color)'
-          e.target.style.color = 'var(--active-color)'
-        }}
-        onMouseLeave={(e) => {
-          e.target.style.borderColor = '#555'
-          e.target.style.color = '#aaa'
-        }}
-      >
-        Reset
-      </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+        {showIcon && (
+          <svg 
+            width="14" 
+            height="14" 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            stroke={isInherited ? "var(--active-color)" : "#888"} 
+            strokeWidth="2" 
+            style={{ opacity: isInherited ? 0.7 : 0.4 }} 
+            title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
+          >
+            <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+            <path d="M2 17l10 5 10-5"></path>
+            <path d="M2 12l10 5 10-5"></path>
+          </svg>
+        )}
+        {isOverridden && (
+          <button
+            className="reset-property-btn-icon"
+            onClick={(e) => {
+              e.stopPropagation()
+              handleResetProperty('Layers', layerName, propertyKey)
+            }}
+            title="Reset to inherited value"
+            style={{
+              padding: '0.125rem',
+              backgroundColor: 'transparent',
+              border: 'none',
+              borderRadius: '4px',
+              color: '#888',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '18px',
+              height: '18px'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.color = 'var(--active-color)'
+              e.target.style.backgroundColor = 'rgba(3, 169, 244, 0.1)'
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.color = '#888'
+              e.target.style.backgroundColor = 'transparent'
+            }}
+          >
+            <svg 
+              width="12" 
+              height="12" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2"
+            >
+              <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
+              <path d="M21 3v5h-5"></path>
+              <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
+              <path d="M3 21v-5h5"></path>
+            </svg>
+          </button>
+        )}
+      </div>
     )
   }
 
@@ -223,22 +237,70 @@ export default function Controls({
       <div className="control-group" key={propertyKey}>
         <div className="label-row">
           <label>{label}</label>
-          {showIcon && (
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke={isInherited ? "var(--active-color)" : "#888"}
-              strokeWidth="2"
-              style={{ opacity: isInherited ? 0.7 : 0.4 }}
-              title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
-            >
-              <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-              <path d="M2 17l10 5 10-5"></path>
-              <path d="M2 12l10 5 10-5"></path>
-            </svg>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+            {showIcon && (
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke={isInherited ? "var(--active-color)" : "#888"}
+                strokeWidth="2"
+                style={{ opacity: isInherited ? 0.7 : 0.4 }}
+                title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
+              >
+                <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                <path d="M2 17l10 5 10-5"></path>
+                <path d="M2 12l10 5 10-5"></path>
+              </svg>
+            )}
+            {isOverridden && (
+              <button
+                className="reset-property-btn-icon"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleResetProperty(category, layerName, propertyKey)
+                }}
+                title="Reset to inherited value"
+                style={{
+                  padding: '0.125rem',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  borderRadius: '4px',
+                  color: '#888',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '18px',
+                  height: '18px'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.color = 'var(--active-color)'
+                  e.target.style.backgroundColor = 'rgba(3, 169, 244, 0.1)'
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.color = '#888'
+                  e.target.style.backgroundColor = 'transparent'
+                }}
+              >
+                <svg 
+                  width="12" 
+                  height="12" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  strokeWidth="2"
+                >
+                  <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
+                  <path d="M21 3v5h-5"></path>
+                  <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
+                  <path d="M3 21v-5h5"></path>
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           {type === 'boolean' ? (
@@ -266,34 +328,6 @@ export default function Controls({
               onChange={(e) => handleRuleUpdate(category, layerName, propertyKey, e.target.value)}
               style={{ flex: 1 }}
             />
-          )}
-          {isOverridden && (
-            <button
-              className="reset-property-btn"
-              onClick={() => handleResetProperty(category, layerName, propertyKey)}
-              title="Reset to inherited value"
-              style={{
-                padding: '0.25rem 0.5rem',
-                fontSize: '0.75rem',
-                backgroundColor: 'transparent',
-                border: '1px solid #555',
-                borderRadius: '4px',
-                color: '#aaa',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                whiteSpace: 'nowrap'
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.borderColor = 'var(--active-color)'
-                e.target.style.color = 'var(--active-color)'
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.borderColor = '#555'
-                e.target.style.color = '#aaa'
-              }}
-            >
-              Reset
-            </button>
           )}
         </div>
       </div>
@@ -388,7 +422,68 @@ export default function Controls({
 
       {/* Layers Section - Accordion Style */}
       <div className="control-section">
-        <h4 className="section-title">Layers</h4>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+          <h4 className="section-title" style={{ margin: 0, paddingBottom: 0, borderBottom: 'none' }}>Layers</h4>
+          <button
+            onClick={() => {
+              const allExpanded = allLayers.length > 0 && allLayers.every(l => localExpandedLayers.has(l.layerKey))
+              if (allExpanded) {
+                // Collapse all
+                setLocalExpandedLayers(new Set())
+                if (setExpandedLayers) {
+                  setExpandedLayers(new Set())
+                }
+              } else {
+                // Expand all
+                const allKeys = new Set(allLayers.map(l => l.layerKey))
+                setLocalExpandedLayers(allKeys)
+                if (setExpandedLayers) {
+                  setExpandedLayers(allKeys)
+                }
+              }
+            }}
+            title={allLayers.length > 0 && allLayers.every(l => localExpandedLayers.has(l.layerKey)) ? 'Collapse all' : 'Expand all'}
+            style={{
+              padding: '0.25rem 0.5rem',
+              fontSize: '0.75rem',
+              backgroundColor: 'transparent',
+              border: '1px solid #444',
+              borderRadius: '4px',
+              color: '#aaa',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.25rem'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.borderColor = 'var(--active-color)'
+              e.target.style.color = 'var(--active-color)'
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.borderColor = '#444'
+              e.target.style.color = '#aaa'
+            }}
+          >
+            {allLayers.length > 0 && allLayers.every(l => localExpandedLayers.has(l.layerKey)) ? (
+              <>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 6L6 18"></path>
+                  <path d="M6 6l12 12"></path>
+                </svg>
+                Collapse All
+              </>
+            ) : (
+              <>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 5v14"></path>
+                  <path d="M5 12h14"></path>
+                </svg>
+                Expand All
+              </>
+            )}
+          </button>
+        </div>
         
         {allLayers.map(({ layerKey, displayName, layerData }) => {
           const isExpanded = localExpandedLayers.has(layerKey)
@@ -518,7 +613,6 @@ export default function Controls({
                               </option>
                             ))}
                           </select>
-                          {renderResetButton(displayName, 'font')}
                         </div>
                       </div>
                       

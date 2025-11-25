@@ -13,6 +13,8 @@ import { escapeCloudinaryString, getDefaultValue, shouldUseMetadata, getMetaKeyF
 import { buildCloudinaryTransform } from '../utils/cloudinaryTransformBuilder'
 import { getAllFieldNames, getFieldDefaultValue, getFieldMetadataSyntax } from '../utils/fieldMetadataUtils'
 import { extractLayers, isTextLayer, isImageLayer } from '../utils/layerUtils'
+import { shouldInheritProperty } from '../utils/inheritanceUtils'
+import { createRuleUpdateHandler } from '../utils/ruleUpdateUtils'
 
 function DesignPlayground() {
   const [selectedAsset, setSelectedAsset] = useState(() => {
@@ -516,61 +518,11 @@ function DesignPlayground() {
   }
 
   // Helper to check if a property is overridden (not inherited) for a child design
-  const isPropertyOverridden = (designId, layerKey, propertyKey) => {
+  const isPropertyOverridden = useCallback((designId, layerKey, propertyKey) => {
     if (designId === 'parent') return false // Parent doesn't inherit
     return propertyOverrides[designId]?.[layerKey]?.[propertyKey] === true
-  }
+  }, [propertyOverrides])
 
-  // Helper to check if a property should be inherited based on type and toggles
-  const shouldInheritProperty = (propertyKey) => {
-    // Canvas dimensions (Width, Height with capital letters) are NEVER inherited
-    // This only applies to General category canvas dimensions, not layer width/height
-    if (propertyKey === 'Width' || propertyKey === 'Height') {
-      return false
-    }
-    // Style properties (color, font, flags, textWrap) are inherited if inheritStyles is ON
-    const styleProperties = ['color', 'font', 'flNoOverflow', 'flTextDisallowOverflow', 'textWrap']
-    if (styleProperties.includes(propertyKey)) {
-      return inheritanceToggles.inheritStyles
-    }
-    // Position/size properties (x, y, width, height, fontSize, gravity, textWidth) are inherited if inheritAll is ON
-    // Note: width/height here refer to layer dimensions (like logo, image), not canvas dimensions
-    const positionSizeProperties = ['x', 'y', 'width', 'height', 'fontSize', 'gravity', 'textWidth']
-    if (positionSizeProperties.includes(propertyKey)) {
-      return inheritanceToggles.inheritAll
-    }
-    return false
-  }
-
-  // Helper to propagate parent property change to children
-  const propagateToChildren = (layerKey, propertyKey, value, newRules) => {
-    if (selectedDesign.id !== 'parent') return newRules // Only propagate from parent
-
-    const shouldInherit = shouldInheritProperty(propertyKey)
-    if (!shouldInherit) return newRules
-
-    // Get child design IDs
-    const childDesigns = DESIGN_TYPES.filter(d => d.id !== 'parent').map(d => d.id)
-
-    childDesigns.forEach(childId => {
-      // Only propagate if child doesn't have an override
-      if (!isPropertyOverridden(childId, layerKey, propertyKey)) {
-        if (layerKey === '_general') {
-          // General properties (width, height) are at design level
-          if (newRules[childId]) {
-            newRules[childId][propertyKey] = value
-          }
-        } else {
-          // Layer properties
-          if (newRules[childId] && newRules[childId][layerKey]) {
-            newRules[childId][layerKey][propertyKey] = value
-          }
-        }
-      }
-    })
-
-    return newRules
-  }
 
   // Handle fontSize validation and revert (prevent percentage in parent)
   const handleFontSizeValidation = (category, layerName, key, value, previousValue) => {
@@ -589,117 +541,18 @@ function DesignPlayground() {
     return true
   }
 
-  // Handle rule value update
-  const handleRuleUpdate = (category, layerName, key, value) => {
-    setEditableRules(prev => {
-      const newRules = JSON.parse(JSON.stringify(prev))
-      const designId = selectedDesign.id
-
-      if (category === 'General') {
-        if (key === 'Width') {
-          const widthValue = parseInt(value) || 0
-          setCanvasDimensions(prev => ({ ...prev, width: widthValue }))
-          // Also update editableRules
-          if (newRules[designId]) {
-            newRules[designId].width = widthValue
-          }
-          // Mark as overridden if child (dimensions never inherit, so no propagation)
-          if (designId !== 'parent') {
-            setPropertyOverrides(prev => ({
-              ...prev,
-              [designId]: {
-                ...prev[designId],
-                _general: { ...prev[designId]?._general, width: true }
-              }
-            }))
-          }
-          // Dimensions are never inherited, so no propagation
-        } else if (key === 'Height') {
-          const heightValue = parseInt(value) || 0
-          setCanvasDimensions(prev => ({ ...prev, height: heightValue }))
-          // Also update editableRules
-          if (newRules[designId]) {
-            newRules[designId].height = heightValue
-          }
-          // Mark as overridden if child (dimensions never inherit, so no propagation)
-          if (designId !== 'parent') {
-            setPropertyOverrides(prev => ({
-              ...prev,
-              [designId]: {
-                ...prev[designId],
-                _general: { ...prev[designId]?._general, height: true }
-              }
-            }))
-          }
-          // Dimensions are never inherited, so no propagation
-        } else if (key === 'Background Color') {
-          setFormValues(prev => ({ ...prev, backgroundColor: value }))
-        }
-      } else if (category === 'Layers' && layerName) {
-        // Map layer display name to key dynamically
-        const layerKey = Object.keys(layerMap).find(
-          key => layerMap[key].displayName === layerName
-        ) || null
-
-        // Track this layer as modified (will cause image reload)
-        // The useEffect watching generatedUrl will set imageLoading when URL changes
-        if (layerKey) {
-          setModifiedLayers(prev => {
-            const newSet = new Set(prev)
-            newSet.add(layerKey)
-            return newSet
-          })
-        }
-
-        // Update layer property
-        if (newRules[designId] && newRules[designId][layerKey]) {
-          // Convert value based on type
-          let convertedValue = value
-          if (key === 'fontSize') {
-            // fontSize can be a number or a string with percentage (e.g., "110%")
-            // Keep as string if it contains %, otherwise convert to number
-            if (typeof value === 'string' && value.includes('%')) {
-              convertedValue = value // Keep as string for percentage
-            } else {
-              convertedValue = isNaN(value) ? value : parseFloat(value)
-            }
-          } else if (key === 'width' || key === 'height' || key === 'x' || key === 'y') {
-            convertedValue = parseInt(value) || 0
-          } else if (key === 'gravity' || key === 'font' || key === 'color') {
-            // String values: gravity, font, color
-            convertedValue = value
-          } else if (key === 'flNoOverflow' || key === 'flTextDisallowOverflow' || key === 'textWrap') {
-            // Boolean values: convert string to boolean
-            convertedValue = value === true || value === 'true' || value === '1'
-          } else if (key === 'textWidth') {
-            // textWidth: number value
-            convertedValue = parseInt(value) || 0
-          } else if (key === 'calculation') {
-            // calculation: object value (for computed fields)
-            convertedValue = value
-          }
-
-          newRules[designId][layerKey][key] = convertedValue
-
-          // Mark as overridden if child, propagate if parent
-          if (designId !== 'parent') {
-            setPropertyOverrides(prev => ({
-              ...prev,
-              [designId]: {
-                ...prev[designId],
-                [layerKey]: { ...prev[designId]?.[layerKey], [key]: true }
-              }
-            }))
-          } else {
-            // Propagate to children
-            propagateToChildren(layerKey, key, convertedValue, newRules)
-          }
-        }
-      }
-
-      return newRules
-    })
-  }
+  // Handle rule value update - created using utility function
+  const handleRuleUpdate = useMemo(() => createRuleUpdateHandler({
+    setEditableRules,
+    selectedDesignId: selectedDesign.id,
+    setCanvasDimensions,
+    setPropertyOverrides,
+    layerMap,
+    setModifiedLayers,
+    setFormValues,
+    inheritanceToggles,
+    isPropertyOverridden
+  }), [selectedDesign.id, layerMap, inheritanceToggles, propertyOverrides, isPropertyOverridden])
 
   // Helper to get layer key from layer display name
   const getLayerKey = useCallback((layerName) => {
@@ -728,7 +581,7 @@ function DesignPlayground() {
     if (isOverridden) return false
 
     // Check if property should be inherited
-    return shouldInheritProperty(normalizedKey)
+    return shouldInheritProperty(normalizedKey, inheritanceToggles)
   }
 
   // Helper to check if a property would be inherited (even if currently overridden)
@@ -745,7 +598,7 @@ function DesignPlayground() {
       : key
 
     // Check if property should be inherited (regardless of override status)
-    return shouldInheritProperty(normalizedKey)
+    return shouldInheritProperty(normalizedKey, inheritanceToggles)
   }
 
   // Helper to check if a property is overridden (for showing reset button)
