@@ -1,11 +1,16 @@
+import { isTextLayer, isImageLayer, isLogoLayer } from './layerUtils'
+
 /**
  * Converts a camelCase string to a display name
  * @param {string} key - The layer key (e.g., 'origPrice', 'title')
+ * @param {Object} layerData - Optional layer data with displayName property
  * @returns {string} Display name (e.g., 'Original Price', 'Title')
  */
-function formatDisplayName(key) {
-  // Handle special cases
-  if (key === 'origPrice') return 'Original Price'
+function formatDisplayName(key, layerData = null) {
+  // Use displayName from layer data if available
+  if (layerData?.displayName) {
+    return layerData.displayName
+  }
   
   // Convert camelCase to Title Case
   return key
@@ -16,8 +21,8 @@ function formatDisplayName(key) {
 
 /**
  * Generates a row key from a layer key
- * @param {string} layerKey - The layer key (e.g., 'title', 'origPrice')
- * @returns {string} Row key (e.g., 'title-layer', 'origPrice-layer')
+ * @param {string} layerKey - The layer key (e.g., 'title'')
+ * @returns {string} Row key (e.g., 'title-layer')
  */
 function generateRowKey(layerKey) {
   return `${layerKey}-layer`
@@ -26,7 +31,7 @@ function generateRowKey(layerKey) {
 /**
  * Extracts layer information from a rules object
  * @param {Object} rules - Rules object (e.g., from DESIGN_RULES or editableRules)
- * @returns {Object} Map of layer keys to { displayName, rowKey }
+ * @returns {Object} Map of layer keys to { displayName, rowKey, layerData }
  */
 export function extractLayersFromRules(rules) {
   if (!rules || typeof rules !== 'object') return {}
@@ -38,8 +43,9 @@ export function extractLayersFromRules(rules) {
     // Skip non-layer keys and only include object values (layers are objects)
     if (!nonLayerKeys.includes(key) && rules[key] && typeof rules[key] === 'object' && !Array.isArray(rules[key])) {
       layerMap[key] = {
-        displayName: formatDisplayName(key),
-        rowKey: generateRowKey(key)
+        displayName: formatDisplayName(key, rules[key]),
+        rowKey: generateRowKey(key),
+        layerData: rules[key] // Include full layer data for type detection
       }
     }
   })
@@ -49,7 +55,7 @@ export function extractLayersFromRules(rules) {
 
 /**
  * Generates a layer configuration from a layer name map
- * @param {Object} layerNameMap - Map of layer keys to { displayName, rowKey }
+ * @param {Object} layerNameMap - Map of layer keys to { displayName, rowKey, layerData }
  * @param {Object} options - Additional options
  * @param {string} options.canvasRowKey - Row key for canvas dimensions (default: 'canvas-dimensions')
  * @param {string} options.backgroundRowKey - Row key for background color (default: 'background-color')
@@ -61,61 +67,101 @@ export function generateLayerConfig(layerNameMap, options = {}) {
   
   const variables = []
   const layerText = []
+  let imageLayerKey = null
+  let logoLayerKey = null
   
-  // Generate variable and layer text patterns from layer map
-  // Process origPrice first to ensure it's matched before price
-  const sortedEntries = Object.entries(layerNameMap).sort(([keyA], [keyB]) => {
-    // Sort origPrice before price
-    if (keyA === 'origPrice' && keyB === 'price') return -1
-    if (keyA === 'price' && keyB === 'origPrice') return 1
-    return 0
+  // Sort entries by order if specified, otherwise maintain object key order
+  // Also identify image and logo layers
+  const sortedEntries = Object.entries(layerNameMap).sort(([keyA, infoA], [keyB, infoB]) => {
+    const orderA = infoA.layerData?.order !== undefined ? infoA.layerData.order : 999
+    const orderB = infoB.layerData?.order !== undefined ? infoB.layerData.order : 999
+    return orderA - orderB
   })
   
+  // First pass: identify image and logo layers
   sortedEntries.forEach(([layerKey, layerInfo]) => {
-    const { rowKey } = layerInfo
+    const layerData = layerInfo.layerData
+    if (isImageLayer(layerData)) {
+      imageLayerKey = layerKey
+    }
+    if (isLogoLayer(layerKey, layerData)) {
+      logoLayerKey = layerKey
+    }
+  })
+  
+  // Build exclude pattern map - layers that contain other layer identifiers
+  const excludePatternMap = {}
+  Object.keys(layerNameMap).forEach(layerKey => {
+    const identifier = layerKey.toLowerCase()
+    const excludePatterns = []
+    
+    // Check if any other layer's identifier is contained in this one
+    Object.keys(layerNameMap).forEach(otherKey => {
+      if (otherKey !== layerKey) {
+        const otherIdentifier = otherKey.toLowerCase()
+        // If this identifier contains the other (e.g., "origprice" contains "price")
+        if (identifier.includes(otherIdentifier) && identifier !== otherIdentifier) {
+          excludePatterns.push(new RegExp(otherIdentifier))
+        }
+      }
+    })
+    
+    if (excludePatterns.length > 0) {
+      excludePatternMap[layerKey] = new RegExp(`(${excludePatterns.map(p => p.source).join('|')})`)
+    }
+  })
+  
+  // Second pass: generate patterns
+  sortedEntries.forEach(([layerKey, layerInfo]) => {
+    const { rowKey, layerData } = layerInfo
     const identifier = layerKey.toLowerCase()
     
-    // Create variable pattern (e.g., $title_, $tagline_)
-    if (layerKey === 'origPrice') {
-      // Special handling for origPrice - match $origprice
-      variables.push({
-        pattern: new RegExp(`\\$origprice`),
-        rowKey: rowKey
-      })
-    } else {
-      variables.push({
-        pattern: new RegExp(`\\$${identifier}`),
-        rowKey: rowKey,
-        // Exclude origprice when matching price
-        excludePattern: layerKey === 'price' ? /origprice/ : undefined
-      })
+    // Skip image and logo layers for variable/layerText patterns (they're handled separately)
+    if (isImageLayer(layerData) || isLogoLayer(layerKey, layerData)) {
+      return
     }
     
-    // Create layer text pattern (e.g., l_text with title, tagline)
-    // Only for text layers (not image or logo)
-    if (layerKey !== 'image' && layerKey !== 'logo') {
+    
+    // Check if layer has a custom variable pattern, otherwise use default
+    // For layers with calculations, use the calculated variable name (e.g., $origprice)
+    let variablePattern
+    if (layerData?.calculation && layerData.calculation.dependsOn) {
+      // Calculated layers use their own variable name (e.g., $origprice)
+      variablePattern = new RegExp(`\\$${identifier}`)
+    } else {
+      variablePattern = new RegExp(`\\$${identifier}`)
+    }
+    
+    variables.push({
+      pattern: variablePattern,
+      rowKey: rowKey,
+      excludePattern: excludePatternMap[layerKey]
+    })
+    
+    // Create layer text pattern (e.g., l_text)
+    // Only for text layers
+    if (isTextLayer(layerData)) {
       layerText.push({
         pattern: new RegExp(identifier),
         rowKey: rowKey,
         type: `layer-${layerKey}`,
-        // Exclude patterns for layers with similar names (e.g., price vs origprice)
-        excludePattern: layerKey === 'price' ? /origprice/ : undefined
+        excludePattern: excludePatternMap[layerKey]
       })
     }
   })
   
-  // Add special variables
-  if (layerNameMap.image) {
+  // Add special variables for image and logo
+  if (imageLayerKey && layerNameMap[imageLayerKey]) {
     variables.unshift({
       pattern: /^\$img_/,
-      rowKey: layerNameMap.image.rowKey
+      rowKey: layerNameMap[imageLayerKey].rowKey
     })
   }
   
-  if (layerNameMap.logo) {
+  if (logoLayerKey && layerNameMap[logoLayerKey]) {
     variables.push({
       pattern: /\$logo/,
-      rowKey: layerNameMap.logo.rowKey
+      rowKey: layerNameMap[logoLayerKey].rowKey
     })
   }
   
@@ -127,14 +173,14 @@ export function generateLayerConfig(layerNameMap, options = {}) {
   return {
     variables,
     layerText,
-    layerImage: layerNameMap.image ? {
+    layerImage: imageLayerKey && layerNameMap[imageLayerKey] ? {
       pattern: /^l_\$img/,
-      rowKey: layerNameMap.image.rowKey,
+      rowKey: layerNameMap[imageLayerKey].rowKey,
       type: 'layer-image'
     } : undefined,
-    layerLogo: layerNameMap.logo ? {
+    layerLogo: logoLayerKey && layerNameMap[logoLayerKey] ? {
       pattern: /^l_/,
-      rowKey: layerNameMap.logo.rowKey,
+      rowKey: layerNameMap[logoLayerKey].rowKey,
       type: 'layer-logo',
       excludePatterns: [/^l_text/, /^l_\$img/]
     } : undefined,
@@ -165,41 +211,15 @@ export function generateLayerConfig(layerNameMap, options = {}) {
  * @returns {Array} Array of segment objects with { text, type, rowKey, separator }
  */
 export function parseUrlSegments(url, baseUrl, publicId, layerConfig = {}) {
-  // Default layer configuration - can be overridden by passing layerConfig
-  const defaultLayerConfig = {
-    variables: [
-      { pattern: /^\$img_/, rowKey: 'image-layer' },
-      { pattern: /\$title/, rowKey: 'title-layer' },
-      { pattern: /\$tagline/, rowKey: 'tagline-layer' },
-      { pattern: /\$price/, rowKey: 'price-layer', excludePattern: /origprice/ },
-      { pattern: /\$origprice/, rowKey: 'origPrice-layer' },
-      { pattern: /\$bgcolor/, rowKey: 'background-color' }
-    ],
-    layerText: [
-      { pattern: /title/, rowKey: 'title-layer', type: 'layer-title' },
-      { pattern: /tagline/, rowKey: 'tagline-layer', type: 'layer-tagline' },
-      { pattern: /origprice/, rowKey: 'origPrice-layer', type: 'layer-origPrice' },
-      { pattern: /price/, rowKey: 'price-layer', type: 'layer-price', excludePattern: /origprice/ }
-    ],
-    layerImage: { pattern: /^l_\$img/, rowKey: 'image-layer', type: 'layer-image' },
-    layerLogo: { 
-      pattern: /^l_/, 
-      rowKey: 'logo-layer', 
-      type: 'layer-logo',
-      excludePatterns: [/^l_text/, /^l_\$img/]
-    },
-    canvas: { pattern: /^c_pad/, rowKey: 'canvas-dimensions', type: 'canvas' },
-    layerApply: { pattern: /^fl_layer_apply/, type: 'layer-apply' }
-  }
-
   // Merge with provided config (provided config takes precedence)
+  // If no config provided, use empty defaults (caller should always provide config from generateLayerConfig)
   const config = {
-    variables: layerConfig.variables ?? defaultLayerConfig.variables,
-    layerText: layerConfig.layerText ?? defaultLayerConfig.layerText,
-    layerImage: layerConfig.layerImage ?? defaultLayerConfig.layerImage,
-    layerLogo: layerConfig.layerLogo ?? defaultLayerConfig.layerLogo,
-    canvas: layerConfig.canvas ?? defaultLayerConfig.canvas,
-    layerApply: layerConfig.layerApply ?? defaultLayerConfig.layerApply
+    variables: layerConfig.variables ?? [],
+    layerText: layerConfig.layerText ?? [],
+    layerImage: layerConfig.layerImage ?? undefined,
+    layerLogo: layerConfig.layerLogo ?? undefined,
+    canvas: layerConfig.canvas ?? { pattern: /^c_pad/, rowKey: 'canvas-dimensions', type: 'canvas' },
+    layerApply: layerConfig.layerApply ?? { pattern: /^fl_layer_apply/, type: 'layer-apply' }
   }
 
   // Extract transformation part

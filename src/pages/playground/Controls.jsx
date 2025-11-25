@@ -1,6 +1,8 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import './Controls.css'
 import { GOOGLE_FONTS } from './constants'
+import { extractLayers, isTextLayer } from '../../utils/layerUtils'
+import { getAllFieldNames } from '../../utils/fieldMetadataUtils'
 
 export default function Controls({
   canvasDimensions,
@@ -18,8 +20,94 @@ export default function Controls({
   getTransformedUrl,
   isPropertyInherited,
   isPropertyOverriddenForDisplay,
-  wouldPropertyBeInherited
+  wouldPropertyBeInherited,
+  layerMap
 }) {
+  // Get all field names dynamically
+  const fieldNames = useMemo(() => {
+    return getAllFieldNames()
+  }, [])
+
+  // Get text layers for layer styles section
+  const textLayers = useMemo(() => {
+    if (!layerMap) return []
+    const rules = editableRules[selectedDesign.id] || editableRules['parent'] || {}
+    const layers = extractLayers(rules)
+    return Object.entries(layers)
+      .filter(([key, data]) => isTextLayer(data))
+      .map(([key, data]) => ({
+        layerKey: key,
+        displayName: layerMap[key]?.displayName || key,
+        layerData: data
+      }))
+      .sort((a, b) => {
+        const orderA = a.layerData.order !== undefined ? a.layerData.order : 999
+        const orderB = b.layerData.order !== undefined ? b.layerData.order : 999
+        return orderA - orderB
+      })
+  }, [layerMap, editableRules, selectedDesign.id])
+
+  // Helper to render inheritance icon
+  const renderInheritanceIcon = (layerName, propertyKey) => {
+    const isInherited = isPropertyInherited('Layers', layerName, propertyKey)
+    const isOverridden = isPropertyOverriddenForDisplay('Layers', layerName, propertyKey)
+    const wouldBeInherited = wouldPropertyBeInherited('Layers', layerName, propertyKey)
+    const showIcon = isInherited || (isOverridden && wouldBeInherited)
+    
+    if (!showIcon) return null
+    
+    return (
+      <svg 
+        width="14" 
+        height="14" 
+        viewBox="0 0 24 24" 
+        fill="none" 
+        stroke={isInherited ? "var(--active-color)" : "#888"} 
+        strokeWidth="2" 
+        style={{ opacity: isInherited ? 0.7 : 0.4 }} 
+        title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
+      >
+        <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+        <path d="M2 17l10 5 10-5"></path>
+        <path d="M2 12l10 5 10-5"></path>
+      </svg>
+    )
+  }
+
+  // Helper to render reset button
+  const renderResetButton = (layerName, propertyKey) => {
+    if (!isPropertyOverriddenForDisplay('Layers', layerName, propertyKey)) return null
+    
+    return (
+      <button
+        className="reset-property-btn"
+        onClick={() => handleResetProperty('Layers', layerName, propertyKey)}
+        title="Reset to inherited value"
+        style={{
+          padding: '0.25rem 0.5rem',
+          fontSize: '0.75rem',
+          backgroundColor: 'transparent',
+          border: '1px solid #555',
+          borderRadius: '4px',
+          color: '#aaa',
+          cursor: 'pointer',
+          transition: 'all 0.2s',
+          whiteSpace: 'nowrap'
+        }}
+        onMouseEnter={(e) => {
+          e.target.style.borderColor = 'var(--active-color)'
+          e.target.style.color = 'var(--active-color)'
+        }}
+        onMouseLeave={(e) => {
+          e.target.style.borderColor = '#555'
+          e.target.style.color = '#aaa'
+        }}
+      >
+        Reset
+      </button>
+    )
+  }
+
   return (
     <div className="controls-panel">
       <h3>Customize</h3>
@@ -244,691 +332,123 @@ export default function Controls({
       <div className="control-section">
         <h4 className="section-title">Fields</h4>
         
-        <div className="control-group">
-          <div className="label-row">
-            <label>Title</label>
-            <div className="toggle-wrapper" onClick={() => handleToggleChange('title')}>
-               <div className={`toggle-track ${useMetadata.title ? 'active' : ''}`}>
-                 <div className="toggle-thumb"></div>
-               </div>
-              <span className="toggle-label">Use Metadata</span>
+        {fieldNames.map(fieldName => {
+          // Skip backgroundColor as it's handled in General section
+          if (fieldName === 'backgroundColor') return null
+          
+          // Get display name from layerMap by finding the layer that has this fieldName
+          let displayName = fieldName.charAt(0).toUpperCase() + fieldName.slice(1)
+          if (layerMap) {
+            const rules = editableRules[selectedDesign.id] || editableRules['parent'] || {}
+            const layers = extractLayers(rules)
+            // Find layer key that matches this fieldName
+            const matchingLayerKey = Object.keys(layers).find(key => {
+              const layerData = layers[key]
+              if (isTextLayer(layerData)) {
+                const layerFieldName = layerData.fieldName || key
+                return layerFieldName === fieldName
+              }
+              return false
+            })
+            if (matchingLayerKey && layerMap[matchingLayerKey]) {
+              displayName = layerMap[matchingLayerKey].displayName
+            }
+          }
+          
+          return (
+            <div key={fieldName} className="control-group">
+              <div className="label-row">
+                <label>{displayName}</label>
+                <div className="toggle-wrapper" onClick={() => handleToggleChange(fieldName)}>
+                  <div className={`toggle-track ${useMetadata[fieldName] ? 'active' : ''}`}>
+                    <div className="toggle-thumb"></div>
+                  </div>
+                  <span className="toggle-label">Use Metadata</span>
+                </div>
+              </div>
+              <input 
+                type="text" 
+                name={fieldName}
+                value={formValues[fieldName] || ''}
+                onChange={handleInputChange}
+              />
             </div>
-          </div>
-          <input 
-            type="text" 
-            name="title"
-            value={formValues.title}
-            onChange={handleInputChange}
-          />
-        </div>
-
-        <div className="control-group">
-          <div className="label-row">
-            <label>Tagline</label>
-            <div className="toggle-wrapper" onClick={() => handleToggleChange('tagline')}>
-               <div className={`toggle-track ${useMetadata.tagline ? 'active' : ''}`}>
-                 <div className="toggle-thumb"></div>
-               </div>
-              <span className="toggle-label">Use Metadata</span>
-            </div>
-          </div>
-          <input 
-            type="text" 
-            name="tagline"
-            value={formValues.tagline}
-            onChange={handleInputChange}
-          />
-        </div>
-
-        <div className="control-group">
-           <div className="label-row">
-            <label>Price ($)</label>
-            <div className="toggle-wrapper" onClick={() => handleToggleChange('price')}>
-               <div className={`toggle-track ${useMetadata.price ? 'active' : ''}`}>
-                 <div className="toggle-thumb"></div>
-               </div>
-              <span className="toggle-label">Use Metadata</span>
-            </div>
-          </div>
-          <input 
-            type="text" 
-            name="price"
-            value={formValues.price}
-            onChange={handleInputChange}
-          />
-        </div>
-
+          )
+        })}
       </div>
 
       {/* Layer Styles Section */}
       <div className="control-section">
         <h4 className="section-title">Layer Styles</h4>
         
-        {/* Title Font */}
-        <div className="control-subsection">
-          <h5 className="subsection-title">Title</h5>
-          <div className="control-group">
-            <div className="label-row">
-              <label>Font</label>
-              {(() => {
-                const isInherited = isPropertyInherited('Layers', 'Title', 'font')
-                const isOverridden = isPropertyOverriddenForDisplay('Layers', 'Title', 'font')
-                const wouldBeInherited = wouldPropertyBeInherited('Layers', 'Title', 'font')
-                const showIcon = isInherited || (isOverridden && wouldBeInherited)
-                return showIcon ? (
-                  <svg 
-                    width="14" 
-                    height="14" 
-                    viewBox="0 0 24 24" 
-                    fill="none" 
-                    stroke={isInherited ? "var(--active-color)" : "#888"} 
-                    strokeWidth="2" 
-                    style={{ opacity: isInherited ? 0.7 : 0.4 }} 
-                    title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
-                  >
-                    <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-                    <path d="M2 17l10 5 10-5"></path>
-                    <path d="M2 12l10 5 10-5"></path>
-                  </svg>
-                ) : null
-              })()}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <select 
-                value={editableRules[selectedDesign.id]?.title?.font || 'Arial'}
-                onChange={(e) => handleRuleUpdate('Layers', 'Title', 'font', e.target.value)}
-                style={{ flex: 1 }}
-              >
-                {GOOGLE_FONTS.map(font => (
-                  <option key={font.value} value={font.value}>
-                    {font.name}
-                  </option>
-                ))}
-              </select>
-              {isPropertyOverriddenForDisplay('Layers', 'Title', 'font') && (
-                <button
-                  className="reset-property-btn"
-                  onClick={() => handleResetProperty('Layers', 'Title', 'font')}
-                  title="Reset to inherited value"
-                  style={{
-                    padding: '0.25rem 0.5rem',
-                    fontSize: '0.75rem',
-                    backgroundColor: 'transparent',
-                    border: '1px solid #555',
-                    borderRadius: '4px',
-                    color: '#aaa',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    whiteSpace: 'nowrap'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.borderColor = 'var(--active-color)'
-                    e.target.style.color = 'var(--active-color)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.borderColor = '#555'
-                    e.target.style.color = '#aaa'
-                  }}
-                >
-                  Reset
-                </button>
-              )}
-            </div>
-          </div>
+        {textLayers.map(({ layerKey, displayName }) => {
+          const layerRules = editableRules[selectedDesign.id]?.[layerKey] || {}
           
-          {/* Text Flags */}
-          <div className="control-group">
-            <div className="label-row">
-              <label>No Overflow</label>
-              {(() => {
-                const isInherited = isPropertyInherited('Layers', 'Title', 'flNoOverflow')
-                const isOverridden = isPropertyOverriddenForDisplay('Layers', 'Title', 'flNoOverflow')
-                const wouldBeInherited = wouldPropertyBeInherited('Layers', 'Title', 'flNoOverflow')
-                const showIcon = isInherited || (isOverridden && wouldBeInherited)
-                return showIcon ? (
-                  <svg 
-                    width="14" 
-                    height="14" 
-                    viewBox="0 0 24 24" 
-                    fill="none" 
-                    stroke={isInherited ? "var(--active-color)" : "#888"} 
-                    strokeWidth="2" 
-                    style={{ opacity: isInherited ? 0.7 : 0.4 }} 
-                    title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
+          return (
+            <div key={layerKey} className="control-subsection">
+              <h5 className="subsection-title">{displayName}</h5>
+              
+              {/* Font */}
+              <div className="control-group">
+                <div className="label-row">
+                  <label>Font</label>
+                  {renderInheritanceIcon(displayName, 'font')}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <select 
+                    value={layerRules.font || 'Arial'}
+                    onChange={(e) => handleRuleUpdate('Layers', displayName, 'font', e.target.value)}
+                    style={{ flex: 1 }}
                   >
-                    <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-                    <path d="M2 17l10 5 10-5"></path>
-                    <path d="M2 12l10 5 10-5"></path>
-                  </svg>
-                ) : null
-              })()}
-            </div>
-            <div className="toggle-wrapper" onClick={() => handleRuleUpdate('Layers', 'Title', 'flNoOverflow', !(editableRules[selectedDesign.id]?.title?.flNoOverflow || false))}>
-              <div className={`toggle-track ${editableRules[selectedDesign.id]?.title?.flNoOverflow ? 'active' : ''}`}>
-                <div className="toggle-thumb"></div>
+                    {GOOGLE_FONTS.map(font => (
+                      <option key={font.value} value={font.value}>
+                        {font.name}
+                      </option>
+                    ))}
+                  </select>
+                  {renderResetButton(displayName, 'font')}
+                </div>
+              </div>
+              
+              {/* Text Flags */}
+              <div className="control-group">
+                <div className="label-row">
+                  <label>No Overflow</label>
+                  {renderInheritanceIcon(displayName, 'flNoOverflow')}
+                </div>
+                <div className="toggle-wrapper" onClick={() => handleRuleUpdate('Layers', displayName, 'flNoOverflow', !(layerRules.flNoOverflow || false))}>
+                  <div className={`toggle-track ${layerRules.flNoOverflow ? 'active' : ''}`}>
+                    <div className="toggle-thumb"></div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="control-group">
+                <div className="label-row">
+                  <label>Disallow Overflow</label>
+                  {renderInheritanceIcon(displayName, 'flTextDisallowOverflow')}
+                </div>
+                <div className="toggle-wrapper" onClick={() => handleRuleUpdate('Layers', displayName, 'flTextDisallowOverflow', !(layerRules.flTextDisallowOverflow || false))}>
+                  <div className={`toggle-track ${layerRules.flTextDisallowOverflow ? 'active' : ''}`}>
+                    <div className="toggle-thumb"></div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="control-group">
+                <div className="label-row">
+                  <label>Text Wrap</label>
+                  {renderInheritanceIcon(displayName, 'textWrap')}
+                </div>
+                <div className="toggle-wrapper" onClick={() => handleRuleUpdate('Layers', displayName, 'textWrap', !(layerRules.textWrap !== false))}>
+                  <div className={`toggle-track ${layerRules.textWrap !== false ? 'active' : ''}`}>
+                    <div className="toggle-thumb"></div>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-          
-          <div className="control-group">
-            <div className="label-row">
-              <label>Disallow Overflow</label>
-              {(() => {
-                const isInherited = isPropertyInherited('Layers', 'Title', 'flTextDisallowOverflow')
-                const isOverridden = isPropertyOverriddenForDisplay('Layers', 'Title', 'flTextDisallowOverflow')
-                const wouldBeInherited = wouldPropertyBeInherited('Layers', 'Title', 'flTextDisallowOverflow')
-                const showIcon = isInherited || (isOverridden && wouldBeInherited)
-                return showIcon ? (
-                  <svg 
-                    width="14" 
-                    height="14" 
-                    viewBox="0 0 24 24" 
-                    fill="none" 
-                    stroke={isInherited ? "var(--active-color)" : "#888"} 
-                    strokeWidth="2" 
-                    style={{ opacity: isInherited ? 0.7 : 0.4 }} 
-                    title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
-                  >
-                    <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-                    <path d="M2 17l10 5 10-5"></path>
-                    <path d="M2 12l10 5 10-5"></path>
-                  </svg>
-                ) : null
-              })()}
-            </div>
-            <div className="toggle-wrapper" onClick={() => handleRuleUpdate('Layers', 'Title', 'flTextDisallowOverflow', !(editableRules[selectedDesign.id]?.title?.flTextDisallowOverflow || false))}>
-              <div className={`toggle-track ${editableRules[selectedDesign.id]?.title?.flTextDisallowOverflow ? 'active' : ''}`}>
-                <div className="toggle-thumb"></div>
-              </div>
-            </div>
-          </div>
-          
-          <div className="control-group">
-            <div className="label-row">
-              <label>Text Wrap</label>
-              {(() => {
-                const isInherited = isPropertyInherited('Layers', 'Title', 'textWrap')
-                const isOverridden = isPropertyOverriddenForDisplay('Layers', 'Title', 'textWrap')
-                const wouldBeInherited = wouldPropertyBeInherited('Layers', 'Title', 'textWrap')
-                const showIcon = isInherited || (isOverridden && wouldBeInherited)
-                return showIcon ? (
-                  <svg 
-                    width="14" 
-                    height="14" 
-                    viewBox="0 0 24 24" 
-                    fill="none" 
-                    stroke={isInherited ? "var(--active-color)" : "#888"} 
-                    strokeWidth="2" 
-                    style={{ opacity: isInherited ? 0.7 : 0.4 }} 
-                    title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
-                  >
-                    <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-                    <path d="M2 17l10 5 10-5"></path>
-                    <path d="M2 12l10 5 10-5"></path>
-                  </svg>
-                ) : null
-              })()}
-            </div>
-            <div className="toggle-wrapper" onClick={() => handleRuleUpdate('Layers', 'Title', 'textWrap', !(editableRules[selectedDesign.id]?.title?.textWrap !== false))}>
-              <div className={`toggle-track ${editableRules[selectedDesign.id]?.title?.textWrap !== false ? 'active' : ''}`}>
-                <div className="toggle-thumb"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Tagline Font */}
-        <div className="control-subsection">
-          <h5 className="subsection-title">Tagline</h5>
-          <div className="control-group">
-            <div className="label-row">
-              <label>Font</label>
-              {(() => {
-                const isInherited = isPropertyInherited('Layers', 'Tagline', 'font')
-                const isOverridden = isPropertyOverriddenForDisplay('Layers', 'Tagline', 'font')
-                const wouldBeInherited = wouldPropertyBeInherited('Layers', 'Tagline', 'font')
-                const showIcon = isInherited || (isOverridden && wouldBeInherited)
-                return showIcon ? (
-                  <svg 
-                    width="14" 
-                    height="14" 
-                    viewBox="0 0 24 24" 
-                    fill="none" 
-                    stroke={isInherited ? "var(--active-color)" : "#888"} 
-                    strokeWidth="2" 
-                    style={{ opacity: isInherited ? 0.7 : 0.4 }} 
-                    title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
-                  >
-                    <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-                    <path d="M2 17l10 5 10-5"></path>
-                    <path d="M2 12l10 5 10-5"></path>
-                  </svg>
-                ) : null
-              })()}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <select 
-                value={editableRules[selectedDesign.id]?.tagline?.font || 'Arial'}
-                onChange={(e) => handleRuleUpdate('Layers', 'Tagline', 'font', e.target.value)}
-                style={{ flex: 1 }}
-              >
-                {GOOGLE_FONTS.map(font => (
-                  <option key={font.value} value={font.value}>
-                    {font.name}
-                  </option>
-                ))}
-              </select>
-              {isPropertyOverriddenForDisplay('Layers', 'Tagline', 'font') && (
-                <button
-                  className="reset-property-btn"
-                  onClick={() => handleResetProperty('Layers', 'Tagline', 'font')}
-                  title="Reset to inherited value"
-                  style={{
-                    padding: '0.25rem 0.5rem',
-                    fontSize: '0.75rem',
-                    backgroundColor: 'transparent',
-                    border: '1px solid #555',
-                    borderRadius: '4px',
-                    color: '#aaa',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    whiteSpace: 'nowrap'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.borderColor = 'var(--active-color)'
-                    e.target.style.color = 'var(--active-color)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.borderColor = '#555'
-                    e.target.style.color = '#aaa'
-                  }}
-                >
-                  Reset
-                </button>
-              )}
-            </div>
-          </div>
-          
-          {/* Text Flags */}
-          <div className="control-group">
-            <div className="label-row">
-              <label>No Overflow</label>
-              {(() => {
-                const isInherited = isPropertyInherited('Layers', 'Tagline', 'flNoOverflow')
-                const isOverridden = isPropertyOverriddenForDisplay('Layers', 'Tagline', 'flNoOverflow')
-                const wouldBeInherited = wouldPropertyBeInherited('Layers', 'Tagline', 'flNoOverflow')
-                const showIcon = isInherited || (isOverridden && wouldBeInherited)
-                return showIcon ? (
-                  <svg 
-                    width="14" 
-                    height="14" 
-                    viewBox="0 0 24 24" 
-                    fill="none" 
-                    stroke={isInherited ? "var(--active-color)" : "#888"} 
-                    strokeWidth="2" 
-                    style={{ opacity: isInherited ? 0.7 : 0.4 }} 
-                    title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
-                  >
-                    <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-                    <path d="M2 17l10 5 10-5"></path>
-                    <path d="M2 12l10 5 10-5"></path>
-                  </svg>
-                ) : null
-              })()}
-            </div>
-            <div className="toggle-wrapper" onClick={() => handleRuleUpdate('Layers', 'Tagline', 'flNoOverflow', !(editableRules[selectedDesign.id]?.tagline?.flNoOverflow || false))}>
-              <div className={`toggle-track ${editableRules[selectedDesign.id]?.tagline?.flNoOverflow ? 'active' : ''}`}>
-                <div className="toggle-thumb"></div>
-              </div>
-            </div>
-          </div>
-          
-          <div className="control-group">
-            <div className="label-row">
-              <label>Disallow Overflow</label>
-              {(() => {
-                const isInherited = isPropertyInherited('Layers', 'Tagline', 'flTextDisallowOverflow')
-                const isOverridden = isPropertyOverriddenForDisplay('Layers', 'Tagline', 'flTextDisallowOverflow')
-                const wouldBeInherited = wouldPropertyBeInherited('Layers', 'Tagline', 'flTextDisallowOverflow')
-                const showIcon = isInherited || (isOverridden && wouldBeInherited)
-                return showIcon ? (
-                  <svg 
-                    width="14" 
-                    height="14" 
-                    viewBox="0 0 24 24" 
-                    fill="none" 
-                    stroke={isInherited ? "var(--active-color)" : "#888"} 
-                    strokeWidth="2" 
-                    style={{ opacity: isInherited ? 0.7 : 0.4 }} 
-                    title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
-                  >
-                    <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-                    <path d="M2 17l10 5 10-5"></path>
-                    <path d="M2 12l10 5 10-5"></path>
-                  </svg>
-                ) : null
-              })()}
-            </div>
-            <div className="toggle-wrapper" onClick={() => handleRuleUpdate('Layers', 'Tagline', 'flTextDisallowOverflow', !(editableRules[selectedDesign.id]?.tagline?.flTextDisallowOverflow || false))}>
-              <div className={`toggle-track ${editableRules[selectedDesign.id]?.tagline?.flTextDisallowOverflow ? 'active' : ''}`}>
-                <div className="toggle-thumb"></div>
-              </div>
-            </div>
-          </div>
-          
-          <div className="control-group">
-            <div className="label-row">
-              <label>Text Wrap</label>
-              {(() => {
-                const isInherited = isPropertyInherited('Layers', 'Tagline', 'textWrap')
-                const isOverridden = isPropertyOverriddenForDisplay('Layers', 'Tagline', 'textWrap')
-                const wouldBeInherited = wouldPropertyBeInherited('Layers', 'Tagline', 'textWrap')
-                const showIcon = isInherited || (isOverridden && wouldBeInherited)
-                return showIcon ? (
-                  <svg 
-                    width="14" 
-                    height="14" 
-                    viewBox="0 0 24 24" 
-                    fill="none" 
-                    stroke={isInherited ? "var(--active-color)" : "#888"} 
-                    strokeWidth="2" 
-                    style={{ opacity: isInherited ? 0.7 : 0.4 }} 
-                    title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
-                  >
-                    <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-                    <path d="M2 17l10 5 10-5"></path>
-                    <path d="M2 12l10 5 10-5"></path>
-                  </svg>
-                ) : null
-              })()}
-            </div>
-            <div className="toggle-wrapper" onClick={() => handleRuleUpdate('Layers', 'Tagline', 'textWrap', !(editableRules[selectedDesign.id]?.tagline?.textWrap !== false))}>
-              <div className={`toggle-track ${editableRules[selectedDesign.id]?.tagline?.textWrap !== false ? 'active' : ''}`}>
-                <div className="toggle-thumb"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Price Font */}
-        <div className="control-subsection">
-          <h5 className="subsection-title">Price</h5>
-          <div className="control-group">
-            <div className="label-row">
-              <label>Font</label>
-              {(() => {
-                const isInherited = isPropertyInherited('Layers', 'Price', 'font')
-                const isOverridden = isPropertyOverriddenForDisplay('Layers', 'Price', 'font')
-                const wouldBeInherited = wouldPropertyBeInherited('Layers', 'Price', 'font')
-                const showIcon = isInherited || (isOverridden && wouldBeInherited)
-                return showIcon ? (
-                  <svg 
-                    width="14" 
-                    height="14" 
-                    viewBox="0 0 24 24" 
-                    fill="none" 
-                    stroke={isInherited ? "var(--active-color)" : "#888"} 
-                    strokeWidth="2" 
-                    style={{ opacity: isInherited ? 0.7 : 0.4 }} 
-                    title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
-                  >
-                    <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-                    <path d="M2 17l10 5 10-5"></path>
-                    <path d="M2 12l10 5 10-5"></path>
-                  </svg>
-                ) : null
-              })()}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <select 
-                value={editableRules[selectedDesign.id]?.price?.font || 'Arial'}
-                onChange={(e) => handleRuleUpdate('Layers', 'Price', 'font', e.target.value)}
-                style={{ flex: 1 }}
-              >
-                {GOOGLE_FONTS.map(font => (
-                  <option key={font.value} value={font.value}>
-                    {font.name}
-                  </option>
-                ))}
-              </select>
-              {isPropertyOverriddenForDisplay('Layers', 'Price', 'font') && (
-                <button
-                  className="reset-property-btn"
-                  onClick={() => handleResetProperty('Layers', 'Price', 'font')}
-                  title="Reset to inherited value"
-                  style={{
-                    padding: '0.25rem 0.5rem',
-                    fontSize: '0.75rem',
-                    backgroundColor: 'transparent',
-                    border: '1px solid #555',
-                    borderRadius: '4px',
-                    color: '#aaa',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    whiteSpace: 'nowrap'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.borderColor = 'var(--active-color)'
-                    e.target.style.color = 'var(--active-color)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.borderColor = '#555'
-                    e.target.style.color = '#aaa'
-                  }}
-                >
-                  Reset
-                </button>
-              )}
-            </div>
-          </div>
-          
-          {/* Text Flags */}
-          <div className="control-group">
-            <div className="label-row">
-              <label>No Overflow</label>
-              {(() => {
-                const isInherited = isPropertyInherited('Layers', 'Price', 'flNoOverflow')
-                const isOverridden = isPropertyOverriddenForDisplay('Layers', 'Price', 'flNoOverflow')
-                const wouldBeInherited = wouldPropertyBeInherited('Layers', 'Price', 'flNoOverflow')
-                const showIcon = isInherited || (isOverridden && wouldBeInherited)
-                return showIcon ? (
-                  <svg 
-                    width="14" 
-                    height="14" 
-                    viewBox="0 0 24 24" 
-                    fill="none" 
-                    stroke={isInherited ? "var(--active-color)" : "#888"} 
-                    strokeWidth="2" 
-                    style={{ opacity: isInherited ? 0.7 : 0.4 }} 
-                    title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
-                  >
-                    <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-                    <path d="M2 17l10 5 10-5"></path>
-                    <path d="M2 12l10 5 10-5"></path>
-                  </svg>
-                ) : null
-              })()}
-            </div>
-            <div className="toggle-wrapper" onClick={() => handleRuleUpdate('Layers', 'Price', 'flNoOverflow', !(editableRules[selectedDesign.id]?.price?.flNoOverflow || false))}>
-              <div className={`toggle-track ${editableRules[selectedDesign.id]?.price?.flNoOverflow ? 'active' : ''}`}>
-                <div className="toggle-thumb"></div>
-              </div>
-            </div>
-          </div>
-          
-          <div className="control-group">
-            <div className="label-row">
-              <label>Disallow Overflow</label>
-              {(() => {
-                const isInherited = isPropertyInherited('Layers', 'Price', 'flTextDisallowOverflow')
-                const isOverridden = isPropertyOverriddenForDisplay('Layers', 'Price', 'flTextDisallowOverflow')
-                const wouldBeInherited = wouldPropertyBeInherited('Layers', 'Price', 'flTextDisallowOverflow')
-                const showIcon = isInherited || (isOverridden && wouldBeInherited)
-                return showIcon ? (
-                  <svg 
-                    width="14" 
-                    height="14" 
-                    viewBox="0 0 24 24" 
-                    fill="none" 
-                    stroke={isInherited ? "var(--active-color)" : "#888"} 
-                    strokeWidth="2" 
-                    style={{ opacity: isInherited ? 0.7 : 0.4 }} 
-                    title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
-                  >
-                    <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-                    <path d="M2 17l10 5 10-5"></path>
-                    <path d="M2 12l10 5 10-5"></path>
-                  </svg>
-                ) : null
-              })()}
-            </div>
-            <div className="toggle-wrapper" onClick={() => handleRuleUpdate('Layers', 'Price', 'flTextDisallowOverflow', !(editableRules[selectedDesign.id]?.price?.flTextDisallowOverflow || false))}>
-              <div className={`toggle-track ${editableRules[selectedDesign.id]?.price?.flTextDisallowOverflow ? 'active' : ''}`}>
-                <div className="toggle-thumb"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Original Price Font */}
-        <div className="control-subsection">
-          <h5 className="subsection-title">Original Price</h5>
-          <div className="control-group">
-            <div className="label-row">
-              <label>Font</label>
-              {(() => {
-                const isInherited = isPropertyInherited('Layers', 'Original Price', 'font')
-                const isOverridden = isPropertyOverriddenForDisplay('Layers', 'Original Price', 'font')
-                const wouldBeInherited = wouldPropertyBeInherited('Layers', 'Original Price', 'font')
-                const showIcon = isInherited || (isOverridden && wouldBeInherited)
-                return showIcon ? (
-                  <svg 
-                    width="14" 
-                    height="14" 
-                    viewBox="0 0 24 24" 
-                    fill="none" 
-                    stroke={isInherited ? "var(--active-color)" : "#888"} 
-                    strokeWidth="2" 
-                    style={{ opacity: isInherited ? 0.7 : 0.4 }} 
-                    title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
-                  >
-                    <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-                    <path d="M2 17l10 5 10-5"></path>
-                    <path d="M2 12l10 5 10-5"></path>
-                  </svg>
-                ) : null
-              })()}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <select 
-                value={editableRules[selectedDesign.id]?.origPrice?.font || 'Arial'}
-                onChange={(e) => handleRuleUpdate('Layers', 'Original Price', 'font', e.target.value)}
-                style={{ flex: 1 }}
-              >
-                {GOOGLE_FONTS.map(font => (
-                  <option key={font.value} value={font.value}>
-                    {font.name}
-                  </option>
-                ))}
-              </select>
-              {isPropertyOverriddenForDisplay('Layers', 'Original Price', 'font') && (
-                <button
-                  className="reset-property-btn"
-                  onClick={() => handleResetProperty('Layers', 'Original Price', 'font')}
-                  title="Reset to inherited value"
-                  style={{
-                    padding: '0.25rem 0.5rem',
-                    fontSize: '0.75rem',
-                    backgroundColor: 'transparent',
-                    border: '1px solid #555',
-                    borderRadius: '4px',
-                    color: '#aaa',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    whiteSpace: 'nowrap'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.borderColor = 'var(--active-color)'
-                    e.target.style.color = 'var(--active-color)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.borderColor = '#555'
-                    e.target.style.color = '#aaa'
-                  }}
-                >
-                  Reset
-                </button>
-              )}
-            </div>
-          </div>
-          
-          {/* Text Flags */}
-          <div className="control-group">
-            <div className="label-row">
-              <label>No Overflow</label>
-              {(() => {
-                const isInherited = isPropertyInherited('Layers', 'Original Price', 'flNoOverflow')
-                const isOverridden = isPropertyOverriddenForDisplay('Layers', 'Original Price', 'flNoOverflow')
-                const wouldBeInherited = wouldPropertyBeInherited('Layers', 'Original Price', 'flNoOverflow')
-                const showIcon = isInherited || (isOverridden && wouldBeInherited)
-                return showIcon ? (
-                  <svg 
-                    width="14" 
-                    height="14" 
-                    viewBox="0 0 24 24" 
-                    fill="none" 
-                    stroke={isInherited ? "var(--active-color)" : "#888"} 
-                    strokeWidth="2" 
-                    style={{ opacity: isInherited ? 0.7 : 0.4 }} 
-                    title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
-                  >
-                    <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-                    <path d="M2 17l10 5 10-5"></path>
-                    <path d="M2 12l10 5 10-5"></path>
-                  </svg>
-                ) : null
-              })()}
-            </div>
-            <div className="toggle-wrapper" onClick={() => handleRuleUpdate('Layers', 'Original Price', 'flNoOverflow', !(editableRules[selectedDesign.id]?.origPrice?.flNoOverflow || false))}>
-              <div className={`toggle-track ${editableRules[selectedDesign.id]?.origPrice?.flNoOverflow ? 'active' : ''}`}>
-                <div className="toggle-thumb"></div>
-              </div>
-            </div>
-          </div>
-          
-          <div className="control-group">
-            <div className="label-row">
-              <label>Disallow Overflow</label>
-              {(() => {
-                const isInherited = isPropertyInherited('Layers', 'Original Price', 'flTextDisallowOverflow')
-                const isOverridden = isPropertyOverriddenForDisplay('Layers', 'Original Price', 'flTextDisallowOverflow')
-                const wouldBeInherited = wouldPropertyBeInherited('Layers', 'Original Price', 'flTextDisallowOverflow')
-                const showIcon = isInherited || (isOverridden && wouldBeInherited)
-                return showIcon ? (
-                  <svg 
-                    width="14" 
-                    height="14" 
-                    viewBox="0 0 24 24" 
-                    fill="none" 
-                    stroke={isInherited ? "var(--active-color)" : "#888"} 
-                    strokeWidth="2" 
-                    style={{ opacity: isInherited ? 0.7 : 0.4 }} 
-                    title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
-                  >
-                    <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-                    <path d="M2 17l10 5 10-5"></path>
-                    <path d="M2 12l10 5 10-5"></path>
-                  </svg>
-                ) : null
-              })()}
-            </div>
-            <div className="toggle-wrapper" onClick={() => handleRuleUpdate('Layers', 'Original Price', 'flTextDisallowOverflow', !(editableRules[selectedDesign.id]?.origPrice?.flTextDisallowOverflow || false))}>
-              <div className={`toggle-track ${editableRules[selectedDesign.id]?.origPrice?.flTextDisallowOverflow ? 'active' : ''}`}>
-                <div className="toggle-thumb"></div>
-              </div>
-            </div>
-          </div>
-        </div>
+          )
+        })}
       </div>
 
       <div className="generated-url">

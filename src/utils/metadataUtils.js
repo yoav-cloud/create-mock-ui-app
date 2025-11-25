@@ -1,3 +1,5 @@
+import { getFieldMetadataKey } from './fieldMetadataUtils'
+
 /**
  * Extracts metadata ID from a value string (e.g., "{ptitle}" → "ptitle")
  * @param {string} value - Value string that may contain metadata syntax
@@ -20,16 +22,12 @@ export function hasMetadataSyntax(value) {
 
 /**
  * Gets metadata key from field name
- * @param {string} field - Field name (e.g., 'title', 'tagline', 'price', 'backgroundColor')
+ * @param {string} field - Field name (e.g., 'title')
  * @returns {string|null} Metadata key or null if not found
+ * @deprecated Use getFieldMetadataKey from fieldMetadataUtils.js instead
  */
 export function getMetadataKey(field) {
-  const keyMap = { 
-    title: 'ptitle', 
-    tagline: 'pdescription', 
-    price: 'pprice',
-    backgroundColor: 'pbackgroundcolor'
-  }
-  return keyMap[field] || null
+  // This function is kept for backward compatibility but should use fieldMetadataUtils
+  return getFieldMetadataKey(field)
 }
 

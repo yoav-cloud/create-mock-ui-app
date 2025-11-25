@@ -17,13 +17,14 @@ export function isImageLayer(layerData) {
 }
 
 /**
- * Determines if a layer is a logo layer (has width, height, and is named 'logo')
+ * Determines if a layer is a logo layer (has isLogo property or layerKey is 'logo')
  * @param {string} layerKey - Layer key
  * @param {Object} layerData - Layer data object
  * @returns {boolean} True if layer is a logo layer
  */
 export function isLogoLayer(layerKey, layerData) {
-  return layerKey === 'logo' && layerData && typeof layerData === 'object' && 'width' in layerData && 'height' in layerData
+  // Check if layer has isLogo property, or fallback to layerKey === 'logo' for backward compatibility
+  return (layerData?.isLogo === true) || (layerKey === 'logo' && layerData && typeof layerData === 'object' && 'width' in layerData && 'height' in layerData)
 }
 
 /**

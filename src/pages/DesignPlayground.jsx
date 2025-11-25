@@ -11,6 +11,8 @@ import { parseUrlSegments as parseUrlSegmentsUtil, generateLayerConfig, extractL
 import { extractMetadataId, hasMetadataSyntax, getMetadataKey } from '../utils/metadataUtils'
 import { escapeCloudinaryString, getDefaultValue, shouldUseMetadata, getMetaKeyForField, getBackgroundColorValue } from '../utils/cloudinaryUtils'
 import { buildCloudinaryTransform } from '../utils/cloudinaryTransformBuilder'
+import { getAllFieldNames, getFieldDefaultValue, getFieldMetadataSyntax } from '../utils/fieldMetadataUtils'
+import { extractLayers, isTextLayer } from '../utils/layerUtils'
 
 function DesignPlayground() {
   const [selectedAsset, setSelectedAsset] = useState(() => {
@@ -25,12 +27,16 @@ function DesignPlayground() {
 
   const [formValues, setFormValues] = useState(() => {
     const saved = localStorage.getItem('playground_form')
-    return saved ? JSON.parse(saved) : {
-      title: 'Now on Sale',
-      tagline: 'Limited Time Offer',
-      price: '80',
-      backgroundColor: '#000428'
+    if (saved) {
+      return JSON.parse(saved)
     }
+    // Initialize dynamically from field definitions
+    const fieldNames = getAllFieldNames()
+    const initialValues = {}
+    fieldNames.forEach(fieldName => {
+      initialValues[fieldName] = getFieldDefaultValue(fieldName)
+    })
+    return initialValues
   })
 
   // Canvas dimensions state - initialized from rules
@@ -71,22 +77,23 @@ function DesignPlayground() {
           const designRule = DESIGN_RULES[designId]
           const savedRule = parsed[designId] || {}
 
-          // Deep merge layer properties (title, tagline, price, origPrice, image, logo)
-          const layerKeys = ['title', 'tagline', 'price', 'origPrice', 'image', 'logo']
+          // Deep merge layer properties dynamically
+          const layers = extractLayers(designRule)
           const mergedLayers = {}
-          layerKeys.forEach(layerKey => {
+          Object.keys(layers).forEach(layerKey => {
             if (designRule[layerKey] || savedRule[layerKey]) {
               mergedLayers[layerKey] = {
                 ...(designRule[layerKey] || {}),
                 ...(savedRule[layerKey] || {})
               }
-              // Ensure textWidth defaults to 80% of canvas width for title and tagline
-              if ((layerKey === 'title' || layerKey === 'tagline') && !mergedLayers[layerKey].textWidth) {
-                mergedLayers[layerKey].textWidth = Math.round((designRule.width || 500) * 0.8)
+              // Ensure textWidth defaults to 80% of canvas width for text layers with textWrap
+              const layerData = mergedLayers[layerKey]
+              if (isTextLayer(layerData) && layerData.textWrap !== false && !layerData.textWidth) {
+                layerData.textWidth = Math.round((designRule.width || 500) * 0.8)
               }
-              // Ensure textWrap defaults to true for title and tagline
-              if ((layerKey === 'title' || layerKey === 'tagline') && mergedLayers[layerKey].textWrap === undefined) {
-                mergedLayers[layerKey].textWrap = true
+              // Ensure textWrap defaults to true for text layers
+              if (isTextLayer(layerData) && layerData.textWrap === undefined) {
+                layerData.textWrap = true
               }
             }
           })
@@ -155,23 +162,31 @@ function DesignPlayground() {
 
   const [useMetadata, setUseMetadata] = useState(() => {
     const saved = localStorage.getItem('playground_metadata_toggles')
-    return saved ? JSON.parse(saved) : {
-      title: false,
-      tagline: false,
-      price: false,
-      backgroundColor: false
+    if (saved) {
+      return JSON.parse(saved)
     }
+    // Initialize dynamically from field definitions
+    const fieldNames = getAllFieldNames()
+    const initialToggles = {}
+    fieldNames.forEach(fieldName => {
+      initialToggles[fieldName] = false
+    })
+    return initialToggles
   })
 
   // Store saved values before toggling metadata on
   const [savedValues, setSavedValues] = useState(() => {
     const saved = localStorage.getItem('playground_saved_values')
-    return saved ? JSON.parse(saved) : {
-      title: null,
-      tagline: null,
-      price: null,
-      backgroundColor: null
+    if (saved) {
+      return JSON.parse(saved)
     }
+    // Initialize dynamically from field definitions
+    const fieldNames = getAllFieldNames()
+    const initialSaved = {}
+    fieldNames.forEach(fieldName => {
+      initialSaved[fieldName] = null
+    })
+    return initialSaved
   })
 
   // Inheritance toggles state
@@ -245,23 +260,17 @@ function DesignPlayground() {
 
   // Initialize formValues to show metadata syntax if toggle is on but formValues doesn't have it
   useEffect(() => {
-    const metaFields = {
-      title: '{ptitle}',
-      tagline: '{pdescription}',
-      price: '{pprice}',
-      backgroundColor: '{pbackgroundcolor}'
-    }
-
+    const fieldNames = getAllFieldNames()
     const updates = {}
     let needsUpdate = false
 
-    Object.keys(metaFields).forEach(field => {
-      if (useMetadata[field]) {
-        const currentValue = formValues[field]
-        const expectedSyntax = metaFields[field]
+    fieldNames.forEach(fieldName => {
+      if (useMetadata[fieldName]) {
+        const currentValue = formValues[fieldName]
+        const expectedSyntax = getFieldMetadataSyntax(fieldName)
         // If toggle is on but value doesn't match metadata syntax, update it
         if (currentValue !== expectedSyntax && !hasMetadataSyntax(currentValue)) {
-          updates[field] = expectedSyntax
+          updates[fieldName] = expectedSyntax
           needsUpdate = true
         }
       }
@@ -290,7 +299,7 @@ function DesignPlayground() {
           const cleaned = formValues[field].replace(/\{[^}]+\}/g, '').trim()
           setSavedValues(prev => ({
             ...prev,
-            [field]: cleaned || (field === 'title' ? 'Now on Sale' : field === 'tagline' ? 'Limited Time Offer' : '80')
+            [field]: cleaned || getFieldDefaultValue(field)
           }))
         }
       }
@@ -343,9 +352,8 @@ function DesignPlayground() {
       // Init-Default-Override Pattern
       // This ensures the variable is never empty/undefined, avoiding "Must specify text" errors.
       const parts = []
-      // Use unique simple temp variable names to avoid parsing issues with underscores
-      const tempVarMap = { title: 'tt', tagline: 'tg', price: 'tp', backgroundColor: 'tb' }
-      const tempVar = tempVarMap[varName] || `t${varName.charAt(0)}`
+      // Generate unique simple temp variable name from varName (first 2 chars, or first char if short)
+      const tempVar = varName.length >= 2 ? varName.substring(0, 2) : `t${varName.charAt(0)}`
 
       // 1. Initialize variable with Default Value first
       parts.push(`$${varName}_${defaultValFormatted}`)
@@ -910,10 +918,7 @@ function DesignPlayground() {
       // If current value contains {metadata}, try to extract the non-metadata part
       if (hasMetadataSyntax(currentValue)) {
         const cleaned = currentValue.replace(/\{[^}]+\}/g, '').trim()
-        valueToSave = cleaned || (field === 'title' ? 'Now on Sale' :
-          field === 'tagline' ? 'Limited Time Offer' :
-            field === 'price' ? '80' :
-              field === 'backgroundColor' ? '#000428' : '')
+        valueToSave = cleaned || getFieldDefaultValue(field)
       }
 
       setSavedValues(prev => ({
@@ -922,11 +927,7 @@ function DesignPlayground() {
       }))
 
       // Set to metadata syntax using {id} format
-      const metaSyntax = field === 'title' ? '{ptitle}' :
-        field === 'tagline' ? '{pdescription}' :
-          field === 'price' ? '{pprice}' :
-            field === 'backgroundColor' ? '{pbackgroundcolor}' :
-              ''
+      const metaSyntax = getFieldMetadataSyntax(field)
       setFormValues(prev => ({
         ...prev,
         [field]: metaSyntax
@@ -935,10 +936,7 @@ function DesignPlayground() {
       // Restore saved value when turning off, or fallback to default
       const valueToRestore = savedValues[field] !== null
         ? savedValues[field]
-        : (field === 'title' ? 'Now on Sale' :
-          field === 'tagline' ? 'Limited Time Offer' :
-            field === 'price' ? '80' :
-              field === 'backgroundColor' ? '#000428' : '')
+        : getFieldDefaultValue(field)
 
       setFormValues(prev => ({
         ...prev,
@@ -1030,6 +1028,7 @@ function DesignPlayground() {
           isPropertyInherited={isPropertyInherited}
           isPropertyOverriddenForDisplay={isPropertyOverriddenForDisplay}
           wouldPropertyBeInherited={wouldPropertyBeInherited}
+          layerMap={layerMap}
         />
       </div>
     </div>

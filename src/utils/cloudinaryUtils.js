@@ -1,5 +1,6 @@
 import { extractMetadataId, hasMetadataSyntax, getMetadataKey } from './metadataUtils'
 import { hexToRgb } from './colorUtils'
+import { getFieldDefaultValue } from './fieldMetadataUtils'
 
 /**
  * Escapes a string for Cloudinary URL encoding
@@ -28,12 +29,8 @@ export function getDefaultValue(field, formValues, useMetadata, savedValues) {
     if (savedValues[field] !== null) {
       return savedValues[field]
     }
-    // If no saved value, use a sensible default based on field
-    return field === 'title' ? 'Now on Sale' : 
-           field === 'tagline' ? 'Limited Time Offer' : 
-           field === 'price' ? '80' :
-           field === 'backgroundColor' ? '#000428' :
-           ''
+    // If no saved value, use default from field definitions
+    return getFieldDefaultValue(field)
   }
   // Toggle is off and no metadata syntax - use formValues directly
   return formVal

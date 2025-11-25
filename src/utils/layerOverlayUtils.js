@@ -2,6 +2,7 @@ import { GRAVITY_VALUES } from '../pages/playground/constants'
 import { calculatePosition } from './positionUtils'
 import { estimateTextWidth, estimateTextHeight, estimateWrappedTextDimensions } from './fontUtils'
 import { hasMetadataSyntax } from './metadataUtils'
+import { extractLayers, isTextLayer, isImageLayer, isLogoLayer, getLayerTextContent, getTextFormatting } from './layerUtils'
 
 /**
  * Calculates layer overlays for the preview image
@@ -69,159 +70,160 @@ export function calculateLayerOverlays({
   // Get rules for current design
   const rules = editableRules[selectedDesignId] || editableRules['parent']
   
+  // Extract all layers dynamically
+  const layers = extractLayers(rules)
+  
+  // Find base font size for percentage calculations (first text layer's fontSize)
+  let baseFontSize = 32 // Default fallback
+  for (const [layerKey, layerData] of Object.entries(layers)) {
+    if (isTextLayer(layerData) && layerData.fontSize) {
+      if (typeof layerData.fontSize === 'string' && layerData.fontSize.endsWith('%')) {
+        baseFontSize = 32 // Default fallback
+      } else {
+        baseFontSize = typeof layerData.fontSize === 'number' ? layerData.fontSize : parseFloat(layerData.fontSize) || 32
+      }
+      break
+    }
+  }
+  
   const newOverlays = []
   
-  // Logo layer
-  if (rules.showLogo !== false && rules.logo) {
-    const logoRules = rules.logo
-    const logoW = (logoRules.width || 100) * scale
-    const logoH = (logoRules.height || 100) * scale
-    const pos = calculatePosition(logoRules.x || 0, logoRules.y || 0, logoRules.gravity || GRAVITY_VALUES.northWest, logoW, logoH, canvasWidth, canvasHeight, scale, imageOffsetX, imageOffsetY)
-    newOverlays.push({
-      id: 'logo',
-      name: 'Logo',
-      ...pos,
-      width: logoW,
-      height: logoH
-    })
-  }
+  // Process layers in order (can be defined by layer.order or use default order)
+  const layerEntries = Object.entries(layers)
   
-  // Title layer (text - calculate actual size)
-  if (rules.title) {
-    const titleRules = rules.title
-    const fontSize = typeof titleRules.fontSize === 'string' && titleRules.fontSize.endsWith('%')
-      ? 32 * (parseFloat(titleRules.fontSize) / 100)
-      : (titleRules.fontSize || 32)
-    const fontFamily = titleRules.font || 'Arial'
-    const textContent = formValues.title || ''
-    const isBold = true // Title is bold
-    const isMetadata = useMetadata.title || hasMetadataSyntax(formValues.title)
+  // Sort layers by order if specified, otherwise maintain object key order
+  layerEntries.sort(([keyA, dataA], [keyB, dataB]) => {
+    const orderA = dataA.order !== undefined ? dataA.order : 999
+    const orderB = dataB.order !== undefined ? dataB.order : 999
+    return orderA - orderB
+  })
+  
+  // Process each layer
+  layerEntries.forEach(([layerKey, layerData]) => {
+    // Generate display name from layer key (capitalize first letter, add spaces)
+    const displayName = layerData.displayName || layerKey
+      .replace(/([A-Z])/g, ' $1')
+      .replace(/^./, str => str.toUpperCase())
+      .trim()
     
-    let titleW, titleH
-    
-    if (!isMetadata && titleRules.textWrap !== false && titleRules.textWidth) {
-      // Text wraps - calculate wrapped dimensions
-      const maxWidth = titleRules.textWidth
-      const dims = estimateWrappedTextDimensions(textContent, fontSize, maxWidth, fontFamily, isBold)
-      titleW = dims.width * scale
-      titleH = dims.height * scale
-    } else {
-      // No wrapping or metadata - calculate exact width
-      titleW = estimateTextWidth(textContent, fontSize, fontFamily, isBold, 'title', isMetadata) * scale
-      titleH = estimateTextHeight(fontSize) * scale
+    if (isLogoLayer(layerKey, layerData)) {
+      // Logo layer - only show if showLogo is enabled
+      if (rules.showLogo === false) return
+      
+      const logoW = (layerData.width || 100) * scale
+      const logoH = (layerData.height || 100) * scale
+      const pos = calculatePosition(
+        layerData.x || 0,
+        layerData.y || 0,
+        layerData.gravity || GRAVITY_VALUES.northWest,
+        logoW,
+        logoH,
+        canvasWidth,
+        canvasHeight,
+        scale,
+        imageOffsetX,
+        imageOffsetY
+      )
+      newOverlays.push({
+        id: layerKey,
+        name: displayName,
+        ...pos,
+        width: logoW,
+        height: logoH
+      })
+    } else if (isTextLayer(layerData)) {
+      // Text layer - calculate actual size
+      const fontSize = typeof layerData.fontSize === 'string' && layerData.fontSize.endsWith('%')
+        ? baseFontSize * (parseFloat(layerData.fontSize) / 100)
+        : (layerData.fontSize || baseFontSize)
+      
+      const fontFamily = layerData.font || 'Arial'
+      
+      // Get text content dynamically
+      let textContent = getLayerTextContent(layerKey, formValues, layerData)
+      
+      // Handle calculations (e.g., origPrice = price * 1.25)
+      if (layerData.calculation && layerData.calculation.dependsOn) {
+        const dependsFieldName = layers[layerData.calculation.dependsOn]?.fieldName || layerData.calculation.dependsOn
+        const dependsValue = formValues[dependsFieldName] || '0'
+        const formula = layerData.calculation.formula || 'mul_1.25'
+        
+        if (formula.startsWith('mul_')) {
+          const multiplier = parseFloat(formula.replace('mul_', '')) || 1.25
+          const calculatedValue = (parseFloat(dependsValue) * multiplier).toFixed(2)
+          textContent = `${layerData.prefix || ''}${calculatedValue}${layerData.suffix || ''}`
+        }
+      } else {
+        // Apply prefix and suffix if specified
+        textContent = `${layerData.prefix || ''}${textContent}${layerData.suffix || ''}`
+      }
+      
+      // Get formatting flags
+      const formatting = getTextFormatting(layerData)
+      const isBold = formatting.bold === true
+      
+      // Get field name for metadata check
+      const fieldName = layerData.fieldName || layerKey
+      const isMetadata = useMetadata[fieldName] || hasMetadataSyntax(formValues[fieldName])
+      
+      let layerW, layerH
+      
+      if (!isMetadata && layerData.textWrap !== false && layerData.textWidth) {
+        // Text wraps - calculate wrapped dimensions
+        const maxWidth = layerData.textWidth
+        const dims = estimateWrappedTextDimensions(textContent, fontSize, maxWidth, fontFamily, isBold)
+        layerW = dims.width * scale
+        layerH = dims.height * scale
+      } else {
+        // No wrapping or metadata - calculate exact width
+        layerW = estimateTextWidth(textContent, fontSize, fontFamily, isBold, layerKey, isMetadata, layerData) * scale
+        layerH = estimateTextHeight(fontSize) * scale
+      }
+      
+      const pos = calculatePosition(
+        layerData.x || 0,
+        layerData.y || 0,
+        layerData.gravity || GRAVITY_VALUES.northWest,
+        layerW,
+        layerH,
+        canvasWidth,
+        canvasHeight,
+        scale,
+        imageOffsetX,
+        imageOffsetY
+      )
+      newOverlays.push({
+        id: layerKey,
+        name: displayName,
+        ...pos,
+        width: layerW,
+        height: layerH
+      })
+    } else if (isImageLayer(layerData)) {
+      // Image layer (main product image)
+      const imgW = (layerData.width || 300) * scale
+      const imgH = (layerData.height || 300) * scale
+      const pos = calculatePosition(
+        layerData.x || 0,
+        layerData.y || 0,
+        layerData.gravity || GRAVITY_VALUES.northWest,
+        imgW,
+        imgH,
+        canvasWidth,
+        canvasHeight,
+        scale,
+        imageOffsetX,
+        imageOffsetY
+      )
+      newOverlays.push({
+        id: layerKey,
+        name: displayName,
+        ...pos,
+        width: imgW,
+        height: imgH
+      })
     }
-    
-    const pos = calculatePosition(titleRules.x || 0, titleRules.y || 0, titleRules.gravity || GRAVITY_VALUES.northWest, titleW, titleH, canvasWidth, canvasHeight, scale, imageOffsetX, imageOffsetY)
-    newOverlays.push({
-      id: 'title',
-      name: 'Title',
-      ...pos,
-      width: titleW,
-      height: titleH
-    })
-  }
-  
-  // Tagline layer (text - calculate actual size)
-  if (rules.tagline) {
-    const taglineRules = rules.tagline
-    const fontSize = typeof taglineRules.fontSize === 'string' && taglineRules.fontSize.endsWith('%')
-      ? 32 * (parseFloat(taglineRules.fontSize) / 100)
-      : (taglineRules.fontSize || 20)
-    const fontFamily = taglineRules.font || 'Arial'
-    const textContent = formValues.tagline || ''
-    const isBold = false // Tagline is italic, not bold
-    const isMetadata = useMetadata.tagline || hasMetadataSyntax(formValues.tagline)
-    
-    let taglineW, taglineH
-    
-    if (!isMetadata && taglineRules.textWrap !== false && taglineRules.textWidth) {
-      // Text wraps - calculate wrapped dimensions
-      const maxWidth = taglineRules.textWidth
-      const dims = estimateWrappedTextDimensions(textContent, fontSize, maxWidth, fontFamily, isBold)
-      taglineW = dims.width * scale
-      taglineH = dims.height * scale
-    } else {
-      // No wrapping or metadata - calculate exact width based on actual text
-      taglineW = estimateTextWidth(textContent, fontSize, fontFamily, isBold, 'tagline', isMetadata) * scale
-      taglineH = estimateTextHeight(fontSize) * scale
-    }
-    
-    const pos = calculatePosition(taglineRules.x || 0, taglineRules.y || 0, taglineRules.gravity || GRAVITY_VALUES.northWest, taglineW, taglineH, canvasWidth, canvasHeight, scale, imageOffsetX, imageOffsetY)
-    newOverlays.push({
-      id: 'tagline',
-      name: 'Tagline',
-      ...pos,
-      width: taglineW,
-      height: taglineH
-    })
-  }
-  
-  // Image layer
-  if (rules.image) {
-    const imgRules = rules.image
-    const imgW = (imgRules.width || 300) * scale
-    const imgH = (imgRules.height || 300) * scale
-    const pos = calculatePosition(imgRules.x || 0, imgRules.y || 0, imgRules.gravity || GRAVITY_VALUES.northWest, imgW, imgH, canvasWidth, canvasHeight, scale, imageOffsetX, imageOffsetY)
-    newOverlays.push({
-      id: 'image',
-      name: 'Main Image',
-      ...pos,
-      width: imgW,
-      height: imgH
-    })
-  }
-  
-  // Original Price layer (text - calculate actual size)
-  if (rules.origPrice) {
-    const origPriceRules = rules.origPrice
-    const fontSize = typeof origPriceRules.fontSize === 'string' && origPriceRules.fontSize.endsWith('%')
-      ? 32 * (parseFloat(origPriceRules.fontSize) / 100)
-      : (origPriceRules.fontSize || 30)
-    const fontFamily = origPriceRules.font || 'Arial'
-    // Original price is calculated as price * 1.25, with strikethrough
-    const priceValue = parseFloat(formValues.price || '0')
-    const origPriceValue = (priceValue * 1.25).toFixed(2)
-    const textContent = `$${origPriceValue}`
-    const isBold = false // Strikethrough, not bold
-    // Original price relies on price metadata status
-    const isMetadata = useMetadata.price || hasMetadataSyntax(formValues.price)
-    
-    const origPriceW = estimateTextWidth(textContent, fontSize, fontFamily, isBold, 'origPrice', isMetadata) * scale
-    const origPriceH = estimateTextHeight(fontSize) * scale
-    
-    const pos = calculatePosition(origPriceRules.x || 0, origPriceRules.y || 0, origPriceRules.gravity || GRAVITY_VALUES.northWest, origPriceW, origPriceH, canvasWidth, canvasHeight, scale, imageOffsetX, imageOffsetY)
-    newOverlays.push({
-      id: 'origPrice',
-      name: 'Original Price',
-      ...pos,
-      width: origPriceW,
-      height: origPriceH
-    })
-  }
-  
-  // Price layer (text - calculate actual size)
-  if (rules.price) {
-    const priceRules = rules.price
-    const fontSize = typeof priceRules.fontSize === 'string' && priceRules.fontSize.endsWith('%')
-      ? 32 * (parseFloat(priceRules.fontSize) / 100)
-      : (priceRules.fontSize || 44)
-    const fontFamily = priceRules.font || 'Arial'
-    const textContent = `$${formValues.price || '0'}`
-    const isBold = true // Price is bold
-    const isMetadata = useMetadata.price || hasMetadataSyntax(formValues.price)
-    
-    const priceW = estimateTextWidth(textContent, fontSize, fontFamily, isBold, 'price', isMetadata) * scale
-    const priceH = estimateTextHeight(fontSize) * scale
-    
-    const pos = calculatePosition(priceRules.x || 0, priceRules.y || 0, priceRules.gravity || GRAVITY_VALUES.northWest, priceW, priceH, canvasWidth, canvasHeight, scale, imageOffsetX, imageOffsetY)
-    newOverlays.push({
-      id: 'price',
-      name: 'Price',
-      ...pos,
-      width: priceW,
-      height: priceH
-    })
-  }
+  })
   
   return newOverlays
 }

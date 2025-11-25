@@ -41,11 +41,12 @@ export function fontToKebabCase(fontName) {
  * @param {number} fontSize - Font size in pixels
  * @param {string} fontFamily - Font family (default: 'Arial')
  * @param {boolean} isBold - Whether text is bold (default: false)
- * @param {string} layerName - Layer name for multiplier adjustment (default: '')
+ * @param {string} layerName - Layer name (deprecated, use layerData instead)
  * @param {boolean} isMetadata - Whether using metadata (default: false)
+ * @param {Object} layerData - Optional layer data object with textWidthMultiplier property
  * @returns {number} Estimated text width in pixels
  */
-export function estimateTextWidth(text, fontSize, fontFamily = 'Arial', isBold = false, layerName = '', isMetadata = false) {
+export function estimateTextWidth(text, fontSize, fontFamily = 'Arial', isBold = false, layerName = '', isMetadata = false, layerData = null) {
   // If using metadata, we can't know the length. Return a fixed small width.
   // Used for indicators when the field is dynamic.
   if (isMetadata) {
@@ -54,22 +55,8 @@ export function estimateTextWidth(text, fontSize, fontFamily = 'Arial', isBold =
 
   if (!text) return 0
   
-  // Adjust multiplier based on layer type
-  let multiplier = 0.6 // default
-  
-  if (layerName === 'price') {
-    // Price text is short (e.g. "$80"), needs small multiplier
-    multiplier = 0.35
-  } else if (layerName === 'origPrice') {
-    // Original price (e.g. "$100.00"), needs larger multiplier than price
-    multiplier = 0.45
-  } else if (layerName === 'title') {
-    // Title - needs larger multiplier
-    multiplier = 0.53
-  } else if (layerName === 'tagline') {
-    // Tagline - needs moderate multiplier
-    multiplier = 0.63
-  }
+  // Get multiplier from layer data if available, otherwise use default
+  let multiplier = layerData?.textWidthMultiplier || 0.6
   
   // Simple calculation: fontSize * character count * multiplier
   return fontSize * text.length * multiplier
