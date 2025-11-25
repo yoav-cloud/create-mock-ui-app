@@ -40,11 +40,6 @@ export default function Controls({
         displayName: layerMap[key]?.displayName || key,
         layerData: data
       }))
-      .sort((a, b) => {
-        const orderA = a.layerData.order !== undefined ? a.layerData.order : 999
-        const orderB = b.layerData.order !== undefined ? b.layerData.order : 999
-        return orderA - orderB
-      })
   }, [layerMap, editableRules, selectedDesign.id])
 
   // Get image layers (with publicId) for image layer controls
@@ -59,11 +54,6 @@ export default function Controls({
         displayName: layerMap[key]?.displayName || key,
         layerData: data
       }))
-      .sort((a, b) => {
-        const orderA = a.layerData.order !== undefined ? a.layerData.order : 999
-        const orderB = b.layerData.order !== undefined ? b.layerData.order : 999
-        return orderA - orderB
-      })
   }, [layerMap, editableRules, selectedDesign.id])
 
   // Helper to render inheritance icon

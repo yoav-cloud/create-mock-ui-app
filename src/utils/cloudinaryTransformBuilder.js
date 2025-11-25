@@ -123,15 +123,8 @@ export function buildCloudinaryTransform({
     `c_pad,w_${padW},h_${padH},b_$bgcolor`
   ]
   
-  // Process layers in order (can be defined by layer.order or use default order)
+  // Process layers in object key order (JavaScript preserves insertion order)
   const layerEntries = Object.entries(layers)
-  
-  // Sort layers by order if specified, otherwise maintain object key order
-  layerEntries.sort(([keyA, dataA], [keyB, dataB]) => {
-    const orderA = dataA.order !== undefined ? dataA.order : 999
-    const orderB = dataB.order !== undefined ? dataB.order : 999
-    return orderA - orderB
-  })
   
   // Find base font size for percentage calculations (first text layer's fontSize)
   let baseFontSize = null

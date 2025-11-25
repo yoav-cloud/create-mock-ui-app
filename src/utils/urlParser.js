@@ -70,13 +70,9 @@ export function generateLayerConfig(layerNameMap, options = {}) {
   let imageLayerKey = null
   let overlayImageLayerKey = null
   
-  // Sort entries by order if specified, otherwise maintain object key order
+  // Process entries in object key order (JavaScript preserves insertion order)
   // Also identify image layers
-  const sortedEntries = Object.entries(layerNameMap).sort(([keyA, infoA], [keyB, infoB]) => {
-    const orderA = infoA.layerData?.order !== undefined ? infoA.layerData.order : 999
-    const orderB = infoB.layerData?.order !== undefined ? infoB.layerData.order : 999
-    return orderA - orderB
-  })
+  const sortedEntries = Object.entries(layerNameMap)
   
   // First pass: identify image layers
   sortedEntries.forEach(([layerKey, layerInfo]) => {
