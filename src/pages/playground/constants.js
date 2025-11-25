@@ -2,23 +2,23 @@
 export const CLOUDINARY_BASE_URL = 'https://res.cloudinary.com/yoav-cloud/image/upload/'
 
 export const ASSETS = [
-  { 
-    id: 'red', 
+  {
+    id: 'red',
     name: 'Red & White',
-    previewUrl: 'https://res.cloudinary.com/yoav-cloud/image/upload/v1763114784/create/shoes/red-white-sneaker-transparent.png', 
-    publicId: 'create/shoes/red-white-sneaker-transparent' 
+    previewUrl: 'https://res.cloudinary.com/yoav-cloud/image/upload/v1763114784/create/shoes/red-white-sneaker-transparent.png',
+    publicId: 'create/shoes/red-white-sneaker-transparent'
   },
-  { 
-    id: 'white', 
+  {
+    id: 'white',
     name: 'White & Blue',
-    previewUrl: 'https://res.cloudinary.com/yoav-cloud/image/upload/v1763114784/create/shoes/sneakers-white_blue-transparent.png', 
-    publicId: 'create/shoes/sneakers-white_blue-transparent' 
+    previewUrl: 'https://res.cloudinary.com/yoav-cloud/image/upload/v1763114784/create/shoes/sneakers-white_blue-transparent.png',
+    publicId: 'create/shoes/sneakers-white_blue-transparent'
   },
-  { 
-    id: 'blue', 
+  {
+    id: 'blue',
     name: 'Blue',
-    previewUrl: 'https://res.cloudinary.com/yoav-cloud/image/upload/v1763114784/create/shoes/blue-sneakers-transparent.png', 
-    publicId: 'create/shoes/blue-sneakers-transparent' 
+    previewUrl: 'https://res.cloudinary.com/yoav-cloud/image/upload/v1763114784/create/shoes/blue-sneakers-transparent.png',
+    publicId: 'create/shoes/blue-sneakers-transparent'
   }
 ]
 
@@ -89,30 +89,30 @@ export const DESIGN_RULES = {
     width: 500,
     height: 900,
     logo: { width: 100, height: 100, x: 10, y: 0, gravity: GRAVITY_VALUES.northEast, displayName: 'Logo', isLogo: true, show: true, publicId: 'create/shoes/shoe-logo-small' },
-    title: { 
-      x: 20, y: 70, gravity: GRAVITY_VALUES.northWest, fontSize: 32, color: '#ffffff', font: 'Arial', 
+    title: {
+      x: 20, y: 70, gravity: GRAVITY_VALUES.northWest, fontSize: 32, color: '#ffffff', font: 'Arial',
       flNoOverflow: true, flTextDisallowOverflow: false, textWrap: true, textWidth: 400,
       fieldName: 'title', bold: true,
       metadataKey: 'ptitle', defaultValue: 'Now on Sale', displayName: 'Title',
       textWidthMultiplier: 0.53
     },
-    tagline: { 
-      x: 30, y: 120, gravity: GRAVITY_VALUES.northEast, fontSize: 20, color: '#ffffff', font: 'Arial', 
+    tagline: {
+      x: 30, y: 120, gravity: GRAVITY_VALUES.northEast, fontSize: 20, color: '#ffffff', font: 'Arial',
       flNoOverflow: true, flTextDisallowOverflow: false, textWrap: true, textWidth: 400,
       fieldName: 'tagline', italic: true,
       metadataKey: 'pdescription', defaultValue: 'Limited Time Offer', displayName: 'Tagline',
       textWidthMultiplier: 0.63
     },
     image: { width: 300, height: 300, x: 10, y: 30, gravity: GRAVITY_VALUES.southEast, displayName: 'Main Image' },
-    origPrice: { 
-      x: 30, y: 40, gravity: GRAVITY_VALUES.southWest, fontSize: 30, color: '#bbbbbb', font: 'Arial', 
+    origPrice: {
+      x: 30, y: 40, gravity: GRAVITY_VALUES.southWest, fontSize: 30, color: '#bbbbbb', font: 'Arial',
       flNoOverflow: false, flTextDisallowOverflow: false,
       calculation: { formula: 'mul_1.25', dependsOn: 'price' },
       strikethrough: true, displayName: 'Original Price',
       textWidthMultiplier: 0.45
     },
-    price: { 
-      x: 130, y: 40, gravity: GRAVITY_VALUES.southWest, fontSize: 44, color: '#ffffff', font: 'Arial', 
+    price: {
+      x: 130, y: 40, gravity: GRAVITY_VALUES.southWest, fontSize: 44, color: '#ffffff', font: 'Arial',
       flNoOverflow: false, flTextDisallowOverflow: false,
       fieldName: 'price', bold: true, prefix: '$', isNumber: true,
       metadataKey: 'pprice', defaultValue: '80', displayName: 'Price',
@@ -122,28 +122,28 @@ export const DESIGN_RULES = {
   'ig-ad': {
     width: 1080,
     height: 1080,
-    logo: { width: 100, height: 100,  x: 10, y: 0, gravity: GRAVITY_VALUES.northEast, displayName: 'Logo', isLogo: true, show: true, publicId: 'create/shoes/shoe-logo-small' },
-    title: { 
-      x: 0, y: 80, gravity: GRAVITY_VALUES.north, fontSize: "110%", color: '#ffffff', font: 'Arial', 
+    logo: { width: 100, height: 100, x: 10, y: 0, gravity: GRAVITY_VALUES.northEast, displayName: 'Logo', isLogo: true, show: true, publicId: 'create/shoes/shoe-logo-small' },
+    title: {
+      x: 0, y: 80, gravity: GRAVITY_VALUES.north, fontSize: "110%", color: '#ffffff', font: 'Arial',
       flNoOverflow: true, flTextDisallowOverflow: false, textWrap: true, textWidth: 864,
       fieldName: 'title', bold: true,
       metadataKey: 'ptitle', defaultValue: 'Now on Sale', displayName: 'Title'
     },
-    tagline: { 
-      x: 0, y: 100, gravity: GRAVITY_VALUES.north, fontSize: 20, color: '#ffffff', font: 'Arial', 
+    tagline: {
+      x: 0, y: 100, gravity: GRAVITY_VALUES.north, fontSize: 20, color: '#ffffff', font: 'Arial',
       flNoOverflow: true, flTextDisallowOverflow: false, textWrap: true, textWidth: 864,
       fieldName: 'tagline', italic: true,
       metadataKey: 'pdescription', defaultValue: 'Limited Time Offer', displayName: 'Tagline'
     },
     image: { width: 350, height: 250, x: 0, y: 120, gravity: GRAVITY_VALUES.north, displayName: 'Main Image' },
-    origPrice: { 
-      x: -44, y: 60, gravity: GRAVITY_VALUES.south, fontSize: 30, color: '#bbbbbb', font: 'Arial', 
+    origPrice: {
+      x: -44, y: 60, gravity: GRAVITY_VALUES.south, fontSize: 30, color: '#bbbbbb', font: 'Arial',
       flNoOverflow: false, flTextDisallowOverflow: false,
       calculation: { formula: 'mul_1.25', dependsOn: 'price' },
       strikethrough: true, displayName: 'Original Price'
     },
-    price: { 
-      x: 0, y: 50, gravity: GRAVITY_VALUES.south, fontSize: 44, color: '#ffffff', font: 'Arial', 
+    price: {
+      x: 0, y: 50, gravity: GRAVITY_VALUES.south, fontSize: 44, color: '#ffffff', font: 'Arial',
       flNoOverflow: false, flTextDisallowOverflow: false,
       fieldName: 'price', bold: true, prefix: '$', isNumber: true,
       metadataKey: 'pprice', defaultValue: '80', displayName: 'Price'
@@ -153,27 +153,27 @@ export const DESIGN_RULES = {
     width: 1080,
     height: 1350,
     logo: { width: 100, height: 100, x: 10, y: 0, gravity: GRAVITY_VALUES.northEast, displayName: 'Logo', isLogo: true, show: true, publicId: 'create/shoes/shoe-logo-small' },
-    title: { 
-      x: 0, y: 30, gravity: GRAVITY_VALUES.north, fontSize: 32, color: '#ffffff', font: 'Arial', 
+    title: {
+      x: 0, y: 30, gravity: GRAVITY_VALUES.north, fontSize: 32, color: '#ffffff', font: 'Arial',
       flNoOverflow: true, flTextDisallowOverflow: false, textWrap: true, textWidth: 864,
       fieldName: 'title', bold: true,
       metadataKey: 'ptitle', defaultValue: 'Now on Sale', displayName: 'Title'
     },
-    tagline: { 
-      x: 0, y: 60, gravity: GRAVITY_VALUES.south, fontSize: 20, color: '#ffffff', font: 'Arial', 
+    tagline: {
+      x: 0, y: 60, gravity: GRAVITY_VALUES.south, fontSize: 20, color: '#ffffff', font: 'Arial',
       flNoOverflow: true, flTextDisallowOverflow: false, textWrap: true, textWidth: 864,
       fieldName: 'tagline', italic: true,
       metadataKey: 'pdescription', defaultValue: 'Limited Time Offer', displayName: 'Tagline'
     },
     image: { width: 380, height: 280, x: 0, y: 60, gravity: GRAVITY_VALUES.center, displayName: 'Main Image' },
-    origPrice: { 
-      x: 0, y: -140, gravity: GRAVITY_VALUES.center, fontSize: "120%", color: '#bbbbbb', font: 'Arial', 
+    origPrice: {
+      x: 0, y: -140, gravity: GRAVITY_VALUES.center, fontSize: "120%", color: '#bbbbbb', font: 'Arial',
       flNoOverflow: false, flTextDisallowOverflow: false,
       calculation: { formula: 'mul_1.25', dependsOn: 'price' },
       strikethrough: true, displayName: 'Original Price'
     },
-    price: { 
-      x: 0, y: -120, gravity: GRAVITY_VALUES.center, fontSize: "150%", color: '#ffffff', font: 'Arial', 
+    price: {
+      x: 0, y: -120, gravity: GRAVITY_VALUES.center, fontSize: "150%", color: '#ffffff', font: 'Arial',
       flNoOverflow: false, flTextDisallowOverflow: false,
       fieldName: 'price', bold: true, prefix: '$', isNumber: true,
       metadataKey: 'pprice', defaultValue: '80', displayName: 'Price'

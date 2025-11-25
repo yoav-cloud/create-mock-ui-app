@@ -320,6 +320,7 @@ function DesignPlayground() {
 
   const [copySuccess, setCopySuccess] = useState('')
   const [imageLoading, setImageLoading] = useState(true)
+  const [modifiedLayers, setModifiedLayers] = useState(new Set()) // Track layers that caused reload
   const [imageError, setImageError] = useState(false)
   // Track the URL currently being displayed in the image tag
   const [currentImageUrl, setCurrentImageUrl] = useState('')
@@ -640,6 +641,16 @@ function DesignPlayground() {
           key => layerMap[key].displayName === layerName
         ) || null
 
+        // Track this layer as modified (will cause image reload)
+        // The useEffect watching generatedUrl will set imageLoading when URL changes
+        if (layerKey) {
+          setModifiedLayers(prev => {
+            const newSet = new Set(prev)
+            newSet.add(layerKey)
+            return newSet
+          })
+        }
+
         // Update layer property
         if (newRules[designId] && newRules[designId][layerKey]) {
           // Convert value based on type
@@ -820,6 +831,7 @@ function DesignPlayground() {
   const handleImageLoad = () => {
     setImageLoading(false)
     setImageError(false)
+    setModifiedLayers(new Set()) // Clear modified layers when image finishes loading
 
     // Show success toast if this is not the initial load and URL actually changed
     if (!isInitialLoad.current && previousUrlRef.current && previousUrlRef.current !== generatedUrl) {
@@ -847,6 +859,31 @@ function DesignPlayground() {
     const { name, value } = e.target
     const hasMetadata = hasMetadataSyntax(value)
     const currentToggleState = useMetadata[name]
+
+    // Find which layer uses this fieldName and track it as modified
+    if (name !== 'backgroundColor') { // backgroundColor is not a layer field
+      const rules = editableRules[selectedDesign.id] || editableRules['parent'] || {}
+      const layers = extractLayers(rules)
+      
+      // Find the layer that uses this fieldName
+      const layerKey = Object.keys(layers).find(key => {
+        const layerData = layers[key]
+        if (isTextLayer(layerData)) {
+          const layerFieldName = layerData.fieldName || key
+          return layerFieldName === name
+        }
+        return false
+      })
+      
+      // Track this layer as modified (will cause image reload)
+      if (layerKey) {
+        setModifiedLayers(prev => {
+          const newSet = new Set(prev)
+          newSet.add(layerKey)
+          return newSet
+        })
+      }
+    }
 
     // Update form value first
     setFormValues(prev => ({
@@ -886,6 +923,31 @@ function DesignPlayground() {
 
   const handleToggleChange = (field) => {
     const isTurningOn = !useMetadata[field]
+
+    // Find which layer uses this fieldName and track it as modified (if not backgroundColor)
+    if (field !== 'backgroundColor') {
+      const rules = editableRules[selectedDesign.id] || editableRules['parent'] || {}
+      const layers = extractLayers(rules)
+      
+      // Find the layer that uses this fieldName
+      const layerKey = Object.keys(layers).find(key => {
+        const layerData = layers[key]
+        if (isTextLayer(layerData)) {
+          const layerFieldName = layerData.fieldName || key
+          return layerFieldName === field
+        }
+        return false
+      })
+      
+      // Track this layer as modified (will cause image reload)
+      if (layerKey) {
+        setModifiedLayers(prev => {
+          const newSet = new Set(prev)
+          newSet.add(layerKey)
+          return newSet
+        })
+      }
+    }
 
     if (isTurningOn) {
       // Save current value before turning on
@@ -978,6 +1040,7 @@ function DesignPlayground() {
           highlightedRow={highlightedRow}
           onSegmentClick={handleSegmentClick}
           onLayerIndicatorClick={handleLayerIndicatorClick}
+          modifiedLayers={modifiedLayers}
           selectedDesign={selectedDesign}
           handleRuleUpdate={handleRuleUpdate}
           handleResetProperty={handleResetProperty}

@@ -24,7 +24,9 @@ export default function LayerIndicators({
   selectedDesignId,
   formValues,
   useMetadata,
-  onLayerIndicatorClick
+  onLayerIndicatorClick,
+  imageLoading,
+  modifiedLayers
 }) {
   const [overlays, setOverlays] = useState([])
 
@@ -74,6 +76,20 @@ export default function LayerIndicators({
     updateOverlays()
   }, [canvasDimensions, editableRules, selectedDesignId, updateOverlays])
 
+  // Debug: Log when modifiedLayers or imageLoading changes
+  useEffect(() => {
+    if (imageLoading && modifiedLayers) {
+      console.log('Image loading:', imageLoading)
+      console.log('Modified layers:', modifiedLayers instanceof Set ? Array.from(modifiedLayers) : modifiedLayers)
+      console.log('Modified layers size:', modifiedLayers instanceof Set ? modifiedLayers.size : 0)
+      console.log('Overlay IDs:', overlays.map(o => o.id))
+      overlays.forEach(overlay => {
+        const isInSet = modifiedLayers instanceof Set ? modifiedLayers.has(overlay.id) : false
+        console.log(`Overlay ${overlay.id} (${overlay.name}): isModified=${isInSet}`)
+      })
+    }
+  }, [imageLoading, modifiedLayers, overlays])
+
   return (
     <>
       {/* Layer Overlay Toggle Button */}
@@ -93,40 +109,54 @@ export default function LayerIndicators({
       </button>
       
       {/* Layer Overlay Rectangles */}
-      {showLayerOverlays && overlays.map((overlay) => (
-        <div
-          key={overlay.id}
-          className="layer-overlay"
-          onClick={() => onLayerIndicatorClick?.(overlay.id)}
-          style={{
-            position: 'absolute',
-            left: `${overlay.left}px`,
-            top: `${overlay.top}px`,
-            width: `${overlay.width}px`,
-            height: `${overlay.height}px`,
-            border: '1px solid rgba(3, 169, 244, 0.8)',
-            backgroundColor: 'rgba(3, 169, 244, 0.1)',
-            pointerEvents: 'auto',
-            cursor: onLayerIndicatorClick ? 'pointer' : 'default',
-            zIndex: 1000,
-            boxSizing: 'border-box',
-            transition: 'all 0.2s ease'
-          }}
-          onMouseEnter={(e) => {
-            if (onLayerIndicatorClick) {
-              e.target.style.borderColor = 'rgba(3, 169, 244, 1)'
-              e.target.style.backgroundColor = 'rgba(3, 169, 244, 0.2)'
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (onLayerIndicatorClick) {
-              e.target.style.borderColor = 'rgba(3, 169, 244, 0.8)'
-              e.target.style.backgroundColor = 'rgba(3, 169, 244, 0.1)'
-            }
-          }}
-          title={onLayerIndicatorClick ? `Click to focus on ${overlay.name} in Controls` : overlay.name}
-        />
-      ))}
+      {showLayerOverlays && overlays.map((overlay) => {
+        // Check if this layer is modified and image is loading
+        const isModified = imageLoading && modifiedLayers && modifiedLayers instanceof Set && modifiedLayers.has(overlay.id)
+        // Gold color for modified layers during loading
+        const borderColor = isModified ? 'rgba(255, 215, 0, 0.9)' : 'rgba(3, 169, 244, 0.8)'
+        const backgroundColor = isModified ? 'rgba(255, 215, 0, 0.15)' : 'rgba(3, 169, 244, 0.1)'
+        
+        return (
+          <div
+            key={overlay.id}
+            className="layer-overlay"
+            onClick={() => onLayerIndicatorClick?.(overlay.id)}
+            style={{
+              position: 'absolute',
+              left: `${overlay.left}px`,
+              top: `${overlay.top}px`,
+              width: `${overlay.width}px`,
+              height: `${overlay.height}px`,
+              border: `1px solid ${borderColor}`,
+              backgroundColor: backgroundColor,
+              pointerEvents: 'auto',
+              cursor: onLayerIndicatorClick ? 'pointer' : 'default',
+              zIndex: 1000,
+              boxSizing: 'border-box',
+              transition: 'all 0.2s ease',
+              boxShadow: isModified ? '0 0 8px rgba(255, 215, 0, 0.4)' : 'none'
+            }}
+            onMouseEnter={(e) => {
+              if (onLayerIndicatorClick) {
+                if (isModified) {
+                  e.target.style.borderColor = 'rgba(255, 215, 0, 1)'
+                  e.target.style.backgroundColor = 'rgba(255, 215, 0, 0.25)'
+                } else {
+                  e.target.style.borderColor = 'rgba(3, 169, 244, 1)'
+                  e.target.style.backgroundColor = 'rgba(3, 169, 244, 0.2)'
+                }
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (onLayerIndicatorClick) {
+                e.target.style.borderColor = borderColor
+                e.target.style.backgroundColor = backgroundColor
+              }
+            }}
+            title={onLayerIndicatorClick ? `Click to focus on ${overlay.name} in Controls${isModified ? ' (reloading...)' : ''}` : overlay.name}
+          />
+        )
+      })}
     </>
   )
 }

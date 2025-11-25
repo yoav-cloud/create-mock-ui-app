@@ -24,6 +24,7 @@ export default function Preview({
   highlightedRow,
   onSegmentClick,
   onLayerIndicatorClick,
+  modifiedLayers,
   selectedDesign,
   handleRuleUpdate,
   handleResetProperty,
@@ -89,17 +90,19 @@ export default function Preview({
           )}
           
           {/* Layer Indicators */}
-          <LayerIndicators
-            wrapperRef={previewWrapperRef}
-            showLayerOverlays={showLayerOverlays}
-            onToggleLayerOverlays={onToggleLayerOverlays}
-            canvasDimensions={canvasDimensions}
-            editableRules={editableRules}
-            selectedDesignId={selectedDesignId}
-            formValues={formValues}
-            useMetadata={useMetadata}
-            onLayerIndicatorClick={onLayerIndicatorClick}
-          />
+              <LayerIndicators
+                wrapperRef={previewWrapperRef}
+                showLayerOverlays={showLayerOverlays}
+                onToggleLayerOverlays={onToggleLayerOverlays}
+                canvasDimensions={canvasDimensions}
+                editableRules={editableRules}
+                selectedDesignId={selectedDesignId}
+                formValues={formValues}
+                useMetadata={useMetadata}
+                onLayerIndicatorClick={onLayerIndicatorClick}
+                imageLoading={imageLoading}
+                modifiedLayers={modifiedLayers}
+              />
         </div>
       ) : (
         <div className="textual-preview">
