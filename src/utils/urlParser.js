@@ -37,7 +37,7 @@ export function extractLayersFromRules(rules) {
   if (!rules || typeof rules !== 'object') return {}
   
   const layerMap = {}
-  const nonLayerKeys = ['width', 'height'] // Keys that are not layers
+  const nonLayerKeys = ['width', 'height', 'backgroundColor'] // Keys that are not layers
   
   Object.keys(rules).forEach(key => {
     // Skip non-layer keys and only include object values (layers are objects)

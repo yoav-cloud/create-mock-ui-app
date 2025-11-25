@@ -578,8 +578,11 @@ export default function Controls({
                   {/* Image Layer Properties */}
                   {isImage && (
                     <>
-                      {renderPropertyControl('Layers', layerKey, 'show', 'Show', 'boolean')}
+                      {/* Show toggle only for overlay images (with publicId), not for main image */}
+                      {layerData.publicId && renderPropertyControl('Layers', layerKey, 'show', 'Show', 'boolean')}
+                      {/* Public ID only for overlay images */}
                       {layerData.publicId && renderPropertyControl('Layers', layerKey, 'publicId', 'Public ID', 'text')}
+                      {/* Common image layer properties */}
                       {renderPropertyControl('Layers', layerKey, 'width', 'Width', 'number')}
                       {renderPropertyControl('Layers', layerKey, 'height', 'Height', 'number')}
                       {renderPropertyControl('Layers', layerKey, 'x', 'X Position', 'number')}

@@ -71,7 +71,7 @@ export function getLayerVariableName(layerKey) {
 export function extractLayers(rules) {
   if (!rules || typeof rules !== 'object') return {}
   
-  const nonLayerKeys = ['width', 'height']
+  const nonLayerKeys = ['width', 'height', 'backgroundColor']
   const layers = {}
   
   Object.keys(rules).forEach(key => {
