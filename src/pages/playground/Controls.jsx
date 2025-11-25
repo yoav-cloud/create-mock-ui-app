@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react'
 import './Controls.css'
-import { GOOGLE_FONTS } from './constants'
-import { extractLayers, isTextLayer } from '../../utils/layerUtils'
+import { GOOGLE_FONTS, GRAVITY_VALUES } from './constants'
+import { extractLayers, isTextLayer, isImageLayer } from '../../utils/layerUtils'
 import { getAllFieldNames } from '../../utils/fieldMetadataUtils'
 
 export default function Controls({
@@ -35,6 +35,25 @@ export default function Controls({
     const layers = extractLayers(rules)
     return Object.entries(layers)
       .filter(([key, data]) => isTextLayer(data))
+      .map(([key, data]) => ({
+        layerKey: key,
+        displayName: layerMap[key]?.displayName || key,
+        layerData: data
+      }))
+      .sort((a, b) => {
+        const orderA = a.layerData.order !== undefined ? a.layerData.order : 999
+        const orderB = b.layerData.order !== undefined ? b.layerData.order : 999
+        return orderA - orderB
+      })
+  }, [layerMap, editableRules, selectedDesign.id])
+
+  // Get image layers (with publicId) for image layer controls
+  const imageLayers = useMemo(() => {
+    if (!layerMap) return []
+    const rules = editableRules[selectedDesign.id] || editableRules['parent'] || {}
+    const layers = extractLayers(rules)
+    return Object.entries(layers)
+      .filter(([key, data]) => isImageLayer(data) && data.publicId)
       .map(([key, data]) => ({
         layerKey: key,
         displayName: layerMap[key]?.displayName || key,
@@ -105,6 +124,111 @@ export default function Controls({
       >
         Reset
       </button>
+    )
+  }
+
+  // Helper to render property control (generic for any layer property)
+  const renderPropertyControl = (category, layerKey, propertyKey, label, type, options = []) => {
+    const layerName = layerMap[layerKey]?.displayName || layerKey
+    const isInherited = isPropertyInherited(category, layerName, propertyKey)
+    const isOverridden = isPropertyOverriddenForDisplay(category, layerName, propertyKey)
+    const wouldBeInherited = wouldPropertyBeInherited(category, layerName, propertyKey)
+    const showIcon = isInherited || (isOverridden && wouldBeInherited)
+
+    const getPropertyValue = (designId, lKey, pKey) => {
+      if (category === 'General') {
+        return editableRules[designId]?.[pKey]
+      }
+      return editableRules[designId]?.[lKey]?.[pKey]
+    }
+
+    let value = getPropertyValue(selectedDesign.id, layerKey, propertyKey)
+    let defaultValue = getPropertyValue('parent', layerKey, propertyKey)
+
+    // Handle boolean values for toggles
+    if (type === 'boolean') {
+      value = value !== false // Default to true if undefined
+      defaultValue = defaultValue !== false
+    }
+
+    return (
+      <div className="control-group" key={propertyKey}>
+        <div className="label-row">
+          <label>{label}</label>
+          {showIcon && (
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke={isInherited ? "var(--active-color)" : "#888"}
+              strokeWidth="2"
+              style={{ opacity: isInherited ? 0.7 : 0.4 }}
+              title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
+            >
+              <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+              <path d="M2 17l10 5 10-5"></path>
+              <path d="M2 12l10 5 10-5"></path>
+            </svg>
+          )}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          {type === 'boolean' ? (
+            <div className="toggle-wrapper" onClick={() => handleRuleUpdate(category, layerName, propertyKey, !value)}>
+              <div className={`toggle-track ${value ? 'active' : ''}`}>
+                <div className="toggle-thumb"></div>
+              </div>
+            </div>
+          ) : type === 'select' ? (
+            <select
+              value={value || ''}
+              onChange={(e) => handleRuleUpdate(category, layerName, propertyKey, e.target.value)}
+              style={{ flex: 1 }}
+            >
+              {options.map(opt => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              type={type === 'number' ? 'number' : type === 'color' ? 'color' : 'text'}
+              value={value || ''}
+              onChange={(e) => handleRuleUpdate(category, layerName, propertyKey, e.target.value)}
+              style={{ flex: 1 }}
+            />
+          )}
+          {isOverridden && (
+            <button
+              className="reset-property-btn"
+              onClick={() => handleResetProperty(category, layerName, propertyKey)}
+              title="Reset to inherited value"
+              style={{
+                padding: '0.25rem 0.5rem',
+                fontSize: '0.75rem',
+                backgroundColor: 'transparent',
+                border: '1px solid #555',
+                borderRadius: '4px',
+                color: '#aaa',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                whiteSpace: 'nowrap'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.borderColor = 'var(--active-color)'
+                e.target.style.color = 'var(--active-color)'
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.borderColor = '#555'
+                e.target.style.color = '#aaa'
+              }}
+            >
+              Reset
+            </button>
+          )}
+        </div>
+      </div>
     )
   }
 
@@ -192,140 +316,6 @@ export default function Controls({
           />
         </div>
 
-        <div className="control-group">
-          <div className="label-row">
-            <label>Show Logo</label>
-            {(() => {
-              const isInherited = isPropertyInherited('General', null, 'showLogo')
-              const isOverridden = isPropertyOverriddenForDisplay('General', null, 'showLogo')
-              const wouldBeInherited = wouldPropertyBeInherited('General', null, 'showLogo')
-              const showIcon = isInherited || (isOverridden && wouldBeInherited)
-              return showIcon ? (
-                <svg 
-                  width="14" 
-                  height="14" 
-                  viewBox="0 0 24 24" 
-                  fill="none" 
-                  stroke={isInherited ? "var(--active-color)" : "#888"} 
-                  strokeWidth="2" 
-                  style={{ opacity: isInherited ? 0.7 : 0.4 }} 
-                  title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
-                >
-                  <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-                  <path d="M2 17l10 5 10-5"></path>
-                  <path d="M2 12l10 5 10-5"></path>
-                </svg>
-              ) : null
-            })()}
-          </div>
-          <div className="toggle-wrapper" onClick={() => {
-            const currentValue = editableRules[selectedDesign.id]?.showLogo !== false
-            handleRuleUpdate('General', null, 'showLogo', !currentValue)
-          }}>
-            <div className={`toggle-track ${(editableRules[selectedDesign.id]?.showLogo !== false) ? 'active' : ''}`}>
-              <div className="toggle-thumb"></div>
-            </div>
-          </div>
-          {isPropertyOverriddenForDisplay('General', null, 'showLogo') && (
-            <button
-              className="reset-property-btn"
-              onClick={() => handleResetProperty('General', null, 'showLogo')}
-              title="Reset to inherited value"
-              style={{
-                marginTop: '0.5rem',
-                padding: '0.25rem 0.5rem',
-                fontSize: '0.75rem',
-                backgroundColor: 'transparent',
-                border: '1px solid #555',
-                borderRadius: '4px',
-                color: '#aaa',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                whiteSpace: 'nowrap'
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.borderColor = 'var(--active-color)'
-                e.target.style.color = 'var(--active-color)'
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.borderColor = '#555'
-                e.target.style.color = '#aaa'
-              }}
-            >
-              Reset
-            </button>
-          )}
-        </div>
-
-        <div className="control-group">
-          <div className="label-row">
-            <label>Logo Public ID</label>
-            {(() => {
-              const isInherited = isPropertyInherited('General', null, 'logoPublicId')
-              const isOverridden = isPropertyOverriddenForDisplay('General', null, 'logoPublicId')
-              const wouldBeInherited = wouldPropertyBeInherited('General', null, 'logoPublicId')
-              const showIcon = isInherited || (isOverridden && wouldBeInherited)
-              return showIcon ? (
-                <svg 
-                  width="14" 
-                  height="14" 
-                  viewBox="0 0 24 24" 
-                  fill="none" 
-                  stroke={isInherited ? "var(--active-color)" : "#888"} 
-                  strokeWidth="2" 
-                  style={{ opacity: isInherited ? 0.7 : 0.4 }} 
-                  title={isInherited ? "Inherited from parent" : "Would inherit from parent (currently overridden)"}
-                >
-                  <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-                  <path d="M2 17l10 5 10-5"></path>
-                  <path d="M2 12l10 5 10-5"></path>
-                </svg>
-              ) : null
-            })()}
-          </div>
-          <input
-            type="text"
-            value={editableRules[selectedDesign.id]?.logoPublicId || 'create/shoes/shoe-logo-small'}
-            onChange={(e) => handleRuleUpdate('General', null, 'logoPublicId', e.target.value)}
-            style={{
-              width: '100%',
-              padding: '0.5rem',
-              border: '1px solid #444',
-              borderRadius: '4px',
-              backgroundColor: '#2a2a2a',
-              color: '#fff'
-            }}
-          />
-          {isPropertyOverriddenForDisplay('General', null, 'logoPublicId') && (
-            <button
-              className="reset-property-btn"
-              onClick={() => handleResetProperty('General', null, 'logoPublicId')}
-              title="Reset to inherited value"
-              style={{
-                marginTop: '0.5rem',
-                padding: '0.25rem 0.5rem',
-                fontSize: '0.75rem',
-                backgroundColor: 'transparent',
-                border: '1px solid #555',
-                borderRadius: '4px',
-                color: '#aaa',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                whiteSpace: 'nowrap'
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.borderColor = 'var(--active-color)'
-                e.target.style.color = 'var(--active-color)'
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.borderColor = '#555'
-                e.target.style.color = '#aaa'
-              }}
-            >
-              Reset
-            </button>
-          )}
-        </div>
       </div>
 
       {/* Fields Section */}
@@ -376,6 +366,26 @@ export default function Controls({
           )
         })}
       </div>
+
+      {/* Image Layers Section */}
+      {imageLayers.length > 0 && (
+        <div className="control-section">
+          <h4 className="section-title">Image Layers</h4>
+
+          {imageLayers.map(({ layerKey, displayName }) => (
+            <div key={layerKey} className="control-subsection">
+              <h5 className="subsection-title">{displayName}</h5>
+              {renderPropertyControl('Layers', layerKey, 'show', 'Show', 'boolean')}
+              {renderPropertyControl('Layers', layerKey, 'publicId', 'Public ID', 'text')}
+              {renderPropertyControl('Layers', layerKey, 'width', 'Width', 'number')}
+              {renderPropertyControl('Layers', layerKey, 'height', 'Height', 'number')}
+              {renderPropertyControl('Layers', layerKey, 'x', 'X Position', 'number')}
+              {renderPropertyControl('Layers', layerKey, 'y', 'Y Position', 'number')}
+              {renderPropertyControl('Layers', layerKey, 'gravity', 'Gravity', 'select', Object.entries(GRAVITY_VALUES).map(([key, value]) => ({ label: key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1').trim(), value: value })))}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Layer Styles Section */}
       <div className="control-section">

@@ -35,20 +35,6 @@ const GENERAL_FIELDS_CONFIG = [
     isSpecial: true, // Uses formValues instead of editableRules
     requiresMetadata: true // Needs useMetadata prop
   },
-  {
-    key: 'showLogo',
-    displayName: 'Show Logo',
-    rowKey: 'logo-show',
-    getValue: (editableRules, selectedDesignId) => editableRules[selectedDesignId]?.showLogo !== false,
-    getValueKey: () => 'showLogo'
-  },
-  {
-    key: 'logoPublicId',
-    displayName: 'Logo Public ID',
-    rowKey: 'logo-public-id',
-    getValue: (editableRules, selectedDesignId) => editableRules[selectedDesignId]?.logoPublicId || 'create/shoes/shoe-logo-small',
-    getValueKey: () => 'logoPublicId'
-  }
 ]
 
 export default function RulesTable({

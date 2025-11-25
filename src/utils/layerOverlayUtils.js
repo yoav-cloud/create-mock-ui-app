@@ -2,7 +2,7 @@ import { GRAVITY_VALUES } from '../pages/playground/constants'
 import { calculatePosition } from './positionUtils'
 import { estimateTextWidth, estimateTextHeight, estimateWrappedTextDimensions } from './fontUtils'
 import { hasMetadataSyntax } from './metadataUtils'
-import { extractLayers, isTextLayer, isImageLayer, isLogoLayer, getLayerTextContent, getTextFormatting } from './layerUtils'
+import { extractLayers, isTextLayer, isImageLayer, getLayerTextContent, getTextFormatting } from './layerUtils'
 
 /**
  * Calculates layer overlays for the preview image
@@ -106,32 +106,7 @@ export function calculateLayerOverlays({
       .replace(/^./, str => str.toUpperCase())
       .trim()
     
-    if (isLogoLayer(layerKey, layerData)) {
-      // Logo layer - only show if showLogo is enabled
-      if (rules.showLogo === false) return
-      
-      const logoW = (layerData.width || 100) * scale
-      const logoH = (layerData.height || 100) * scale
-      const pos = calculatePosition(
-        layerData.x || 0,
-        layerData.y || 0,
-        layerData.gravity || GRAVITY_VALUES.northWest,
-        logoW,
-        logoH,
-        canvasWidth,
-        canvasHeight,
-        scale,
-        imageOffsetX,
-        imageOffsetY
-      )
-      newOverlays.push({
-        id: layerKey,
-        name: displayName,
-        ...pos,
-        width: logoW,
-        height: logoH
-      })
-    } else if (isTextLayer(layerData)) {
+    if (isTextLayer(layerData)) {
       // Text layer - calculate actual size
       const fontSize = typeof layerData.fontSize === 'string' && layerData.fontSize.endsWith('%')
         ? baseFontSize * (parseFloat(layerData.fontSize) / 100)
@@ -200,9 +175,15 @@ export function calculateLayerOverlays({
         height: layerH
       })
     } else if (isImageLayer(layerData)) {
-      // Image layer (main product image)
-      const imgW = (layerData.width || 300) * scale
-      const imgH = (layerData.height || 300) * scale
+      // Image layer - can be main product image or overlay image (logo, etc.)
+      
+      // Check if layer should be shown (for overlay images with show property)
+      if (layerData.show === false) {
+        return
+      }
+      
+      const imgW = (layerData.width || (layerData.publicId ? 100 : 300)) * scale
+      const imgH = (layerData.height || (layerData.publicId ? 100 : 300)) * scale
       const pos = calculatePosition(
         layerData.x || 0,
         layerData.y || 0,

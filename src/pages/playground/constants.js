@@ -85,9 +85,7 @@ export const DESIGN_RULES = {
   'parent': {
     width: 500,
     height: 900,
-    showLogo: true,
-    logoPublicId: 'create/shoes/shoe-logo-small',
-    logo: { width: 100, height: 100, x: 10, y: 0, gravity: GRAVITY_VALUES.northEast, order: 1, displayName: 'Logo' },
+    logo: { width: 100, height: 100, x: 10, y: 0, gravity: GRAVITY_VALUES.northEast, order: 1, displayName: 'Logo', isLogo: true, show: true, publicId: 'create/shoes/shoe-logo-small' },
     title: { 
       x: 20, y: 70, gravity: GRAVITY_VALUES.northWest, fontSize: 32, color: '#ffffff', font: 'Arial', 
       flNoOverflow: true, flTextDisallowOverflow: false, textWrap: true, textWidth: 400,
@@ -121,9 +119,7 @@ export const DESIGN_RULES = {
   'ig-ad': {
     width: 1080,
     height: 1080,
-    showLogo: true,
-    logoPublicId: 'create/shoes/shoe-logo-small',
-    logo: { width: 100, height: 100,  x: 10, y: 0, gravity: GRAVITY_VALUES.northEast, order: 1, displayName: 'Logo' },
+    logo: { width: 100, height: 100,  x: 10, y: 0, gravity: GRAVITY_VALUES.northEast, order: 1, displayName: 'Logo', isLogo: true, show: true, publicId: 'create/shoes/shoe-logo-small' },
     title: { 
       x: 0, y: 80, gravity: GRAVITY_VALUES.north, fontSize: "110%", color: '#ffffff', font: 'Arial', 
       flNoOverflow: true, flTextDisallowOverflow: false, textWrap: true, textWidth: 864,
@@ -153,9 +149,7 @@ export const DESIGN_RULES = {
   'fb-mobile': {
     width: 1080,
     height: 1350,
-    showLogo: true,
-    logoPublicId: 'create/shoes/shoe-logo-small',
-    logo: { width: 100, height: 100, x: 10, y: 0, gravity: GRAVITY_VALUES.northEast, order: 1, displayName: 'Logo' },
+    logo: { width: 100, height: 100, x: 10, y: 0, gravity: GRAVITY_VALUES.northEast, order: 1, displayName: 'Logo', isLogo: true, show: true, publicId: 'create/shoes/shoe-logo-small' },
     title: { 
       x: 0, y: 30, gravity: GRAVITY_VALUES.north, fontSize: 32, color: '#ffffff', font: 'Arial', 
       flNoOverflow: true, flTextDisallowOverflow: false, textWrap: true, textWidth: 864,

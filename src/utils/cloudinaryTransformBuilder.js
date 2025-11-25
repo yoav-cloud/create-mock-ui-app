@@ -1,6 +1,6 @@
 import { calculateFontSize, fontToKebabCase, buildTextFlags } from './fontUtils'
 import { hexToRgb } from './colorUtils'
-import { extractLayers, isTextLayer, isImageLayer, isLogoLayer, getLayerTextContent, getTextFormatting, getLayerVariableName } from './layerUtils'
+import { extractLayers, isTextLayer, isImageLayer, getLayerTextContent, getTextFormatting, getLayerVariableName } from './layerUtils'
 import { escapeCloudinaryString } from './cloudinaryUtils'
 import { GRAVITY_VALUES } from '../pages/playground/constants'
 
@@ -148,25 +148,7 @@ export function buildCloudinaryTransform({
   
   // Process each layer
   layerEntries.forEach(([layerKey, layerData]) => {
-    if (isLogoLayer(layerKey, layerData)) {
-      // Logo layer
-      const showLogo = rules.showLogo !== false
-      if (!showLogo) return
-      
-      const logoPublicId = rules.logoPublicId || 'create/shoes/shoe-logo-small'
-      const logoPublicIdClean = logoPublicId.replace(/\//g, ':')
-      const logoW = s(layerData.width || 100)
-      const logoH = s(layerData.height || 100)
-      const logoX = s(layerData.x || 0)
-      const logoY = s(layerData.y || 0)
-      const logoGravity = layerData.gravity || GRAVITY_VALUES.northWest
-      
-      transformParts.push(
-        `l_${logoPublicIdClean}`,
-        `c_fit,w_${logoW},h_${logoH}`,
-        `fl_layer_apply,g_${logoGravity},x_${logoX},y_${logoY}`
-      )
-    } else if (isTextLayer(layerData)) {
+    if (isTextLayer(layerData)) {
       // Text layer
       const fieldName = layerData.fieldName || layerKey
       const varName = variableMap[layerKey] || getLayerVariableName(layerKey)
@@ -223,15 +205,40 @@ export function buildCloudinaryTransform({
       
       transformParts.push(`fl_layer_apply,g_${gravity},x_${x},y_${y}${flagsStr}`)
     } else if (isImageLayer(layerData)) {
-      // Image layer (main product image)
-      const imgW = s(layerData.width || 300)
-      const imgH = s(layerData.height || 300)
+      // Image layer - can be main product image or overlay image (logo, etc.)
+      
+      // Check if layer should be shown (for overlay images with show property)
+      if (layerData.show === false) {
+        return
+      }
+      
+      // Get public ID: use layer's publicId if specified, otherwise it's the main product image
+      if (!layerData.publicId) {
+        // Main product image uses $img variable
+        const imgW = s(layerData.width || 300)
+        const imgH = s(layerData.height || 300)
+        const imgX = s(layerData.x || 0)
+        const imgY = s(layerData.y || 0)
+        const imgGravity = layerData.gravity || GRAVITY_VALUES.northWest
+        
+        transformParts.push(
+          `l_$img`,
+          `c_fit,w_${imgW},h_${imgH}`,
+          `fl_layer_apply,g_${imgGravity},x_${imgX},y_${imgY}`
+        )
+        return
+      }
+      
+      // Image layer with specific publicId (overlay image like logo)
+      const publicIdClean = layerData.publicId.replace(/\//g, ':')
+      const imgW = s(layerData.width || 100)
+      const imgH = s(layerData.height || 100)
       const imgX = s(layerData.x || 0)
       const imgY = s(layerData.y || 0)
       const imgGravity = layerData.gravity || GRAVITY_VALUES.northWest
       
       transformParts.push(
-        `l_$img`,
+        `l_${publicIdClean}`,
         `c_fit,w_${imgW},h_${imgH}`,
         `fl_layer_apply,g_${imgGravity},x_${imgX},y_${imgY}`
       )

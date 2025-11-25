@@ -1,4 +1,4 @@
-import { isTextLayer, isImageLayer, isLogoLayer } from './layerUtils'
+import { isTextLayer, isImageLayer } from './layerUtils'
 
 /**
  * Converts a camelCase string to a display name
@@ -37,7 +37,7 @@ export function extractLayersFromRules(rules) {
   if (!rules || typeof rules !== 'object') return {}
   
   const layerMap = {}
-  const nonLayerKeys = ['width', 'height', 'showLogo', 'logoPublicId'] // Keys that are not layers
+  const nonLayerKeys = ['width', 'height'] // Keys that are not layers
   
   Object.keys(rules).forEach(key => {
     // Skip non-layer keys and only include object values (layers are objects)
@@ -68,24 +68,27 @@ export function generateLayerConfig(layerNameMap, options = {}) {
   const variables = []
   const layerText = []
   let imageLayerKey = null
-  let logoLayerKey = null
+  let overlayImageLayerKey = null
   
   // Sort entries by order if specified, otherwise maintain object key order
-  // Also identify image and logo layers
+  // Also identify image layers
   const sortedEntries = Object.entries(layerNameMap).sort(([keyA, infoA], [keyB, infoB]) => {
     const orderA = infoA.layerData?.order !== undefined ? infoA.layerData.order : 999
     const orderB = infoB.layerData?.order !== undefined ? infoB.layerData.order : 999
     return orderA - orderB
   })
   
-  // First pass: identify image and logo layers
+  // First pass: identify image layers
   sortedEntries.forEach(([layerKey, layerInfo]) => {
     const layerData = layerInfo.layerData
     if (isImageLayer(layerData)) {
-      imageLayerKey = layerKey
-    }
-    if (isLogoLayer(layerKey, layerData)) {
-      logoLayerKey = layerKey
+      // Main image layer (uses $img variable) - no publicId
+      if (!layerData.publicId) {
+        imageLayerKey = layerKey
+      } else {
+        // Overlay image layer (has publicId) - like logo
+        overlayImageLayerKey = layerKey
+      }
     }
   })
   
@@ -116,8 +119,8 @@ export function generateLayerConfig(layerNameMap, options = {}) {
     const { rowKey, layerData } = layerInfo
     const identifier = layerKey.toLowerCase()
     
-    // Skip image and logo layers for variable/layerText patterns (they're handled separately)
-    if (isImageLayer(layerData) || isLogoLayer(layerKey, layerData)) {
+    // Skip image layers for variable/layerText patterns (they're handled separately)
+    if (isImageLayer(layerData)) {
       return
     }
     
@@ -150,18 +153,11 @@ export function generateLayerConfig(layerNameMap, options = {}) {
     }
   })
   
-  // Add special variables for image and logo
+  // Add special variables for image layers
   if (imageLayerKey && layerNameMap[imageLayerKey]) {
     variables.unshift({
       pattern: /^\$img_/,
       rowKey: layerNameMap[imageLayerKey].rowKey
-    })
-  }
-  
-  if (logoLayerKey && layerNameMap[logoLayerKey]) {
-    variables.push({
-      pattern: /\$logo/,
-      rowKey: layerNameMap[logoLayerKey].rowKey
     })
   }
   
@@ -178,10 +174,10 @@ export function generateLayerConfig(layerNameMap, options = {}) {
       rowKey: layerNameMap[imageLayerKey].rowKey,
       type: 'layer-image'
     } : undefined,
-    layerLogo: logoLayerKey && layerNameMap[logoLayerKey] ? {
+    layerOverlayImage: overlayImageLayerKey && layerNameMap[overlayImageLayerKey] ? {
       pattern: /^l_/,
-      rowKey: layerNameMap[logoLayerKey].rowKey,
-      type: 'layer-logo',
+      rowKey: layerNameMap[overlayImageLayerKey].rowKey,
+      type: `layer-${overlayImageLayerKey}`,
       excludePatterns: [/^l_text/, /^l_\$img/]
     } : undefined,
     canvas: {
@@ -205,7 +201,7 @@ export function generateLayerConfig(layerNameMap, options = {}) {
  * @param {Array} layerConfig.variables - Array of variable pattern configs: { pattern: RegExp, rowKey: string, excludePattern?: RegExp }
  * @param {Array} layerConfig.layerText - Array of layer text pattern configs: { pattern: RegExp, rowKey: string, type: string, excludePattern?: RegExp }
  * @param {Object} layerConfig.layerImage - Image layer config: { pattern: RegExp, rowKey: string, type: string }
- * @param {Object} layerConfig.layerLogo - Logo layer config: { pattern: RegExp, rowKey: string, type: string, excludePatterns?: Array<RegExp> }
+ * @param {Object} layerConfig.layerOverlayImage - Overlay image layer config: { pattern: RegExp, rowKey: string, type: string, excludePatterns?: Array<RegExp> }
  * @param {Object} layerConfig.canvas - Canvas config: { pattern: RegExp, rowKey: string, type: string }
  * @param {Object} layerConfig.layerApply - Layer apply config: { pattern: RegExp, type: string }
  * @returns {Array} Array of segment objects with { text, type, rowKey, separator }
@@ -217,7 +213,7 @@ export function parseUrlSegments(url, baseUrl, publicId, layerConfig = {}) {
     variables: layerConfig.variables ?? [],
     layerText: layerConfig.layerText ?? [],
     layerImage: layerConfig.layerImage ?? undefined,
-    layerLogo: layerConfig.layerLogo ?? undefined,
+    layerOverlayImage: layerConfig.layerOverlayImage ?? undefined,
     canvas: layerConfig.canvas ?? { pattern: /^c_pad/, rowKey: 'canvas-dimensions', type: 'canvas' },
     layerApply: layerConfig.layerApply ?? { pattern: /^fl_layer_apply/, type: 'layer-apply' }
   }
@@ -273,27 +269,27 @@ export function parseUrlSegments(url, baseUrl, publicId, layerConfig = {}) {
       type = config.layerImage.type
       rowKey = config.layerImage.rowKey
     }
-    // Check layer logo pattern
-    else if (!rowKey && config.layerLogo.pattern.test(part)) {
+    // Check overlay image layer pattern (e.g., logo or other overlay images)
+    else if (!rowKey && config.layerOverlayImage?.pattern.test(part)) {
       // Check if it matches exclude patterns
-      const matchesExclude = config.layerLogo.excludePatterns?.some(excludePattern => 
+      const matchesExclude = config.layerOverlayImage.excludePatterns?.some(excludePattern => 
         excludePattern.test(part)
       )
       if (!matchesExclude) {
-        type = config.layerLogo.type
-        rowKey = config.layerLogo.rowKey
+        type = config.layerOverlayImage.type
+        rowKey = config.layerOverlayImage.rowKey
       }
     }
-    // Check c_fit after logo layer (special case)
+    // Check c_fit after overlay image layer (special case)
     else if (!rowKey && part.startsWith('c_fit') && index > 0) {
       const prevPart = parts[index - 1]
-      if (config.layerLogo.pattern.test(prevPart)) {
-        const matchesExclude = config.layerLogo.excludePatterns?.some(excludePattern => 
+      if (config.layerOverlayImage?.pattern.test(prevPart)) {
+        const matchesExclude = config.layerOverlayImage.excludePatterns?.some(excludePattern => 
           excludePattern.test(prevPart)
         )
         if (!matchesExclude) {
-          type = config.layerLogo.type
-          rowKey = config.layerLogo.rowKey
+          type = config.layerOverlayImage.type
+          rowKey = config.layerOverlayImage.rowKey
         }
       }
     }
@@ -347,15 +343,15 @@ function determineLayerApplyRowKey(parts, index, config) {
     }
   }
   
-  // Check two parts back for logo layer (fl_layer_apply after logo layer and c_fit)
+  // Check two parts back for overlay image layer (fl_layer_apply after overlay image layer and c_fit)
   if (index > 1) {
     const prevPrevPart = parts[index - 2]
-    if (config.layerLogo.pattern.test(prevPrevPart)) {
-      const matchesExclude = config.layerLogo.excludePatterns?.some(excludePattern => 
+    if (config.layerOverlayImage?.pattern.test(prevPrevPart)) {
+      const matchesExclude = config.layerOverlayImage.excludePatterns?.some(excludePattern => 
         excludePattern.test(prevPrevPart)
       )
       if (!matchesExclude) {
-        return config.layerLogo.rowKey
+        return config.layerOverlayImage.rowKey
       }
     }
   }

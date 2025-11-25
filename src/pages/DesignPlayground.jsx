@@ -101,10 +101,7 @@ function DesignPlayground() {
           merged[designId] = {
             ...designRule,
             ...savedRule,
-            ...mergedLayers,
-            // Ensure showLogo and logoPublicId are merged
-            showLogo: savedRule.showLogo !== undefined ? savedRule.showLogo : (designRule.showLogo !== undefined ? designRule.showLogo : true),
-            logoPublicId: savedRule.logoPublicId || designRule.logoPublicId || 'create/shoes/shoe-logo-small'
+            ...mergedLayers
           }
         })
         // Ensure textWidth defaults for text layers with textWrap in merged rules
@@ -491,10 +488,6 @@ function DesignPlayground() {
     if (propertyKey === 'Width' || propertyKey === 'Height') {
       return false
     }
-    // Logo properties (showLogo, logoPublicId) are inherited if inheritAll is ON
-    if (propertyKey === 'showLogo' || propertyKey === 'logoPublicId') {
-      return inheritanceToggles.inheritAll
-    }
     // Style properties (color, font, flags, textWrap) are inherited if inheritStyles is ON
     const styleProperties = ['color', 'font', 'flNoOverflow', 'flTextDisallowOverflow', 'textWrap']
     if (styleProperties.includes(propertyKey)) {
@@ -601,58 +594,6 @@ function DesignPlayground() {
           // Dimensions are never inherited, so no propagation
         } else if (key === 'Background Color') {
           setFormValues(prev => ({ ...prev, backgroundColor: value }))
-        } else if (key === 'showLogo') {
-          // Update showLogo
-          if (newRules[designId]) {
-            newRules[designId].showLogo = value
-          }
-          // Mark as overridden if child, propagate if parent
-          if (designId !== 'parent') {
-            setPropertyOverrides(prev => ({
-              ...prev,
-              [designId]: {
-                ...prev[designId],
-                _general: { ...prev[designId]?._general, showLogo: true }
-              }
-            }))
-          } else {
-            // Propagate to children if inheritAll is enabled
-            if (inheritanceToggles.inheritAll) {
-              Object.keys(newRules).forEach(childId => {
-                if (childId !== 'parent' && !isPropertyOverridden(childId, '_general', 'showLogo')) {
-                  if (newRules[childId]) {
-                    newRules[childId].showLogo = value
-                  }
-                }
-              })
-            }
-          }
-        } else if (key === 'logoPublicId') {
-          // Update logoPublicId
-          if (newRules[designId]) {
-            newRules[designId].logoPublicId = value
-          }
-          // Mark as overridden if child, propagate if parent
-          if (designId !== 'parent') {
-            setPropertyOverrides(prev => ({
-              ...prev,
-              [designId]: {
-                ...prev[designId],
-                _general: { ...prev[designId]?._general, logoPublicId: true }
-              }
-            }))
-          } else {
-            // Propagate to children if inheritAll is enabled
-            if (inheritanceToggles.inheritAll) {
-              Object.keys(newRules).forEach(childId => {
-                if (childId !== 'parent' && !isPropertyOverridden(childId, '_general', 'logoPublicId')) {
-                  if (newRules[childId]) {
-                    newRules[childId].logoPublicId = value
-                  }
-                }
-              })
-            }
-          }
         }
       } else if (category === 'Layers' && layerName) {
         // Map layer display name to key dynamically
@@ -808,11 +749,6 @@ function DesignPlayground() {
             setCanvasDimensions(prev => ({ ...prev, width: parentValue }))
           } else {
             setCanvasDimensions(prev => ({ ...prev, height: parentValue }))
-          }
-        } else if (key === 'showLogo' || key === 'logoPublicId') {
-          const parentValue = newRules['parent']?.[key]
-          if (parentValue !== undefined && newRules[designId]) {
-            newRules[designId][key] = parentValue
           }
         }
       } else if (category === 'Layers' && layerName && layerKey) {

@@ -16,16 +16,6 @@ export function isImageLayer(layerData) {
   return layerData && typeof layerData === 'object' && 'width' in layerData && 'height' in layerData && !('fontSize' in layerData)
 }
 
-/**
- * Determines if a layer is a logo layer (has isLogo property or layerKey is 'logo')
- * @param {string} layerKey - Layer key
- * @param {Object} layerData - Layer data object
- * @returns {boolean} True if layer is a logo layer
- */
-export function isLogoLayer(layerKey, layerData) {
-  // Check if layer has isLogo property, or fallback to layerKey === 'logo' for backward compatibility
-  return (layerData?.isLogo === true) || (layerKey === 'logo' && layerData && typeof layerData === 'object' && 'width' in layerData && 'height' in layerData)
-}
 
 /**
  * Gets text content for a layer based on form values and layer key
@@ -81,7 +71,7 @@ export function getLayerVariableName(layerKey) {
 export function extractLayers(rules) {
   if (!rules || typeof rules !== 'object') return {}
   
-  const nonLayerKeys = ['width', 'height', 'showLogo', 'logoPublicId']
+  const nonLayerKeys = ['width', 'height']
   const layers = {}
   
   Object.keys(rules).forEach(key => {
