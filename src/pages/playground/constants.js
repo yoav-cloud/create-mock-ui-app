@@ -1,3 +1,6 @@
+// Cloudinary configuration
+export const CLOUDINARY_BASE_URL = 'https://res.cloudinary.com/yoav-cloud/image/upload/'
+
 export const ASSETS = [
   { 
     id: 'red', 

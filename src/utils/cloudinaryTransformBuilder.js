@@ -2,7 +2,7 @@ import { calculateFontSize, fontToKebabCase, buildTextFlags } from './fontUtils'
 import { hexToRgb } from './colorUtils'
 import { extractLayers, isTextLayer, isImageLayer, getLayerTextContent, getTextFormatting, getLayerVariableName } from './layerUtils'
 import { escapeCloudinaryString } from './cloudinaryUtils'
-import { GRAVITY_VALUES } from '../pages/playground/constants'
+import { GRAVITY_VALUES, CLOUDINARY_BASE_URL } from '../pages/playground/constants'
 
 /**
  * Builds Cloudinary transformation URL dynamically from rules
@@ -246,6 +246,6 @@ export function buildCloudinaryTransform({
   })
   
   const transformString = transformParts.join('/')
-  return `https://res.cloudinary.com/yoav-cloud/image/upload/${transformString}/${selectedAsset.publicId}.png`
+  return `${CLOUDINARY_BASE_URL}${transformString}/${selectedAsset.publicId}.png`
 }
 

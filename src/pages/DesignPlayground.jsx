@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import toast from 'react-hot-toast'
 import './DesignPlayground.css'
-import { ASSETS, DESIGN_TYPES, DESIGN_RULES, GRAVITY_VALUES, GOOGLE_FONTS, LIGHT_BLUE, BASE_WIDTH } from './playground/constants'
+import { ASSETS, DESIGN_TYPES, DESIGN_RULES, GRAVITY_VALUES, GOOGLE_FONTS, LIGHT_BLUE, BASE_WIDTH, CLOUDINARY_BASE_URL } from './playground/constants'
 import PlaygroundHeader from './playground/PlaygroundHeader'
 import DesignSelector from './playground/DesignSelector'
 import Preview from './playground/Preview'
@@ -413,7 +413,7 @@ function DesignPlayground() {
   const urlSegments = useMemo(() => {
     return parseUrlSegmentsUtil(
       generatedUrl,
-      'https://res.cloudinary.com/yoav-cloud/image/upload/',
+      CLOUDINARY_BASE_URL,
       selectedAsset.publicId,
       layerConfig
     )
