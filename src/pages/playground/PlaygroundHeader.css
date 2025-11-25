@@ -1,0 +1,58 @@
+.playground-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 2rem;
+  background-color: #252525;
+  border-bottom: 1px solid #333;
+  height: 100px; /* Fixed height for header */
+  box-sizing: border-box;
+  position: relative; /* For absolute centering if needed, or just flex */
+}
+
+.playground-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+/* Spacer to balance the right side if needed, or just use absolute centering for middle */
+.header-spacer {
+  width: 200px;
+}
+
+.asset-selector-container {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  justify-content: center;
+}
+
+.asset-selector {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.asset-option {
+  width: 70px;
+  height: 70px;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 3px solid transparent;
+  transition: border-color 0.2s, transform 0.2s;
+  background: #333;
+}
+
+.asset-option.active {
+  border-color: var(--active-color);
+  transform: scale(1.05);
+}
+
+.asset-option img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+

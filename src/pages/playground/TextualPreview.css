@@ -1,0 +1,127 @@
+/* URL Preview Card */
+.url-preview-card {
+  background-color: #252525;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border: 1px solid #333;
+}
+
+.url-preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.url-preview-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.url-open-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem 0.5rem;
+  background-color: transparent;
+  border: 1px solid #555;
+  border-radius: 4px;
+  color: #aaa;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.url-open-button:hover {
+  border-color: var(--active-color);
+  color: var(--active-color);
+  background-color: rgba(3, 169, 244, 0.1);
+}
+
+.url-preview-content {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.75rem;
+  line-height: 1.6;
+  color: #ccc;
+  word-break: break-all;
+  overflow-wrap: break-word;
+}
+
+.url-preview-content .url-segment {
+  font-size: 0.7rem;
+  display: inline;
+}
+
+.url-segment {
+  transition: all 0.3s ease;
+  border-radius: 3px;
+  display: inline;
+}
+
+.url-segment-base {
+  color: #4a9eff;
+}
+
+.url-segment-variable {
+  color: #ff6b9d;
+  background-color: rgba(255, 107, 157, 0.1);
+}
+
+.url-segment-canvas {
+  color: #51cf66;
+  background-color: rgba(81, 207, 102, 0.1);
+}
+
+.url-segment-layer-logo {
+  color: #9C27B0;
+  background-color: rgba(156, 39, 176, 0.1);
+}
+
+.url-segment-layer-title {
+  color: #ffd43b;
+  background-color: rgba(255, 212, 59, 0.1);
+}
+
+.url-segment-layer-tagline {
+  color: #74c0fc;
+  background-color: rgba(116, 192, 252, 0.1);
+}
+
+.url-segment-layer-image {
+  color: #ff922b;
+  background-color: rgba(255, 146, 43, 0.1);
+}
+
+.url-segment-layer-origPrice {
+  color: #c2255c;
+  background-color: rgba(194, 37, 92, 0.1);
+}
+
+.url-segment-layer-price {
+  color: #20c997;
+  background-color: rgba(32, 201, 151, 0.1);
+}
+
+.url-segment-layer-apply {
+  color: #9775fa;
+  background-color: rgba(151, 117, 250, 0.1);
+}
+
+.url-segment-publicId {
+  color: #868e96;
+}
+
+.url-segment-separator {
+  color: #666;
+}
+
+.url-segment.highlighted {
+  background-color: var(--active-color) !important;
+  color: #fff !important;
+  box-shadow: 0 0 8px rgba(3, 169, 244, 0.5);
+  transform: scale(1.05);
+}
+
