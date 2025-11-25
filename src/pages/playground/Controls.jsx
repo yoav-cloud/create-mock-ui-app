@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useEffect, useState } from 'react'
 import './Controls.css'
 import { GOOGLE_FONTS, GRAVITY_VALUES } from './constants'
 import { extractLayers, isTextLayer, isImageLayer } from '../../utils/layerUtils'
@@ -21,40 +21,118 @@ export default function Controls({
   isPropertyInherited,
   isPropertyOverriddenForDisplay,
   wouldPropertyBeInherited,
-  layerMap
+  layerMap,
+  highlightedField,
+  expandedLayers,
+  setExpandedLayers,
+  highlightedLayer
 }) {
-  // Get all field names dynamically
-  const fieldNames = useMemo(() => {
-    return getAllFieldNames()
-  }, [])
-
-  // Get text layers for layer styles section
-  const textLayers = useMemo(() => {
+  // Get all layers in order from design_rules
+  const allLayers = useMemo(() => {
     if (!layerMap) return []
     const rules = editableRules[selectedDesign.id] || editableRules['parent'] || {}
     const layers = extractLayers(rules)
-    return Object.entries(layers)
-      .filter(([key, data]) => isTextLayer(data))
-      .map(([key, data]) => ({
+    
+    // Get layer keys in the order they appear in design_rules (object key order)
+    // We need to match against the original design_rules structure
+    const layerKeys = Object.keys(layerMap) // layerMap keys are in design_rules order
+    
+    return layerKeys
+      .filter(key => layers[key]) // Only include layers that exist in current rules
+      .map(key => ({
         layerKey: key,
         displayName: layerMap[key]?.displayName || key,
-        layerData: data
+        layerData: layers[key]
       }))
   }, [layerMap, editableRules, selectedDesign.id])
 
-  // Get image layers (with publicId) for image layer controls
-  const imageLayers = useMemo(() => {
-    if (!layerMap) return []
-    const rules = editableRules[selectedDesign.id] || editableRules['parent'] || {}
-    const layers = extractLayers(rules)
-    return Object.entries(layers)
-      .filter(([key, data]) => isImageLayer(data) && data.publicId)
-      .map(([key, data]) => ({
-        layerKey: key,
-        displayName: layerMap[key]?.displayName || key,
-        layerData: data
-      }))
-  }, [layerMap, editableRules, selectedDesign.id])
+  // Initialize expanded layers state
+  const [localExpandedLayers, setLocalExpandedLayers] = useState(() => {
+    // Initialize with all layers expanded by default, or use prop if provided
+    if (expandedLayers !== undefined) {
+      return expandedLayers
+    }
+    return new Set(allLayers.map(l => l.layerKey))
+  })
+
+  // Sync with prop if provided
+  useEffect(() => {
+    if (expandedLayers !== undefined) {
+      setLocalExpandedLayers(expandedLayers)
+    }
+  }, [expandedLayers])
+
+  // Toggle layer expansion
+  const toggleLayer = (layerKey) => {
+    const newExpanded = new Set(localExpandedLayers)
+    if (newExpanded.has(layerKey)) {
+      newExpanded.delete(layerKey)
+    } else {
+      newExpanded.add(layerKey)
+    }
+    setLocalExpandedLayers(newExpanded)
+    if (setExpandedLayers) {
+      setExpandedLayers(newExpanded)
+    }
+  }
+
+  // Expand a specific layer when highlightedField changes (called from parent when layer indicator is clicked)
+  useEffect(() => {
+    if (highlightedField) {
+      // Find the layer that corresponds to this field
+      const layer = allLayers.find(l => {
+        if (isTextLayer(l.layerData)) {
+          const fieldName = l.layerData.fieldName || l.layerKey
+          return fieldName === highlightedField
+        }
+        return false
+      })
+      
+      if (layer) {
+        setLocalExpandedLayers(prev => {
+          const newExpanded = new Set(prev)
+          newExpanded.add(layer.layerKey)
+          if (setExpandedLayers) {
+            setExpandedLayers(newExpanded)
+          }
+          return newExpanded
+        })
+      }
+    }
+  }, [highlightedField, allLayers, setExpandedLayers])
+
+  // Apply/remove highlighted class to control groups and accordions, and scroll to accordion
+  useEffect(() => {
+    // Remove all highlights first
+    document.querySelectorAll('.control-group.highlighted').forEach(el => {
+      el.classList.remove('highlighted')
+    })
+    document.querySelectorAll('.layer-accordion.highlighted').forEach(el => {
+      el.classList.remove('highlighted')
+    })
+
+    // Add highlight to matching accordion and scroll
+    if (highlightedLayer) {
+      // Small delay to ensure accordion is expanded before scrolling
+      setTimeout(() => {
+        const accordionElement = document.querySelector(`[data-layer-key="${highlightedLayer}"]`)
+        if (accordionElement) {
+          accordionElement.classList.add('highlighted')
+          // Scroll to the accordion, showing as much of it as possible
+          // Use 'nearest' block to show as much as possible without cutting off
+          accordionElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+        }
+      }, 100) // Wait for accordion expansion animation
+    }
+
+    // Add highlight to matching field
+    if (highlightedField) {
+      const fieldElement = document.querySelector(`[data-field-name="${highlightedField}"]`)
+      if (fieldElement) {
+        fieldElement.classList.add('highlighted')
+      }
+    }
+  }, [highlightedField, highlightedLayer])
 
   // Helper to render inheritance icon
   const renderInheritanceIcon = (layerName, propertyKey) => {
@@ -308,144 +386,209 @@ export default function Controls({
 
       </div>
 
-      {/* Fields Section */}
+      {/* Layers Section - Accordion Style */}
       <div className="control-section">
-        <h4 className="section-title">Fields</h4>
+        <h4 className="section-title">Layers</h4>
         
-        {fieldNames.map(fieldName => {
-          // Skip backgroundColor as it's handled in General section
-          if (fieldName === 'backgroundColor') return null
-          
-          // Get display name from layerMap by finding the layer that has this fieldName
-          let displayName = fieldName.charAt(0).toUpperCase() + fieldName.slice(1)
-          if (layerMap) {
-            const rules = editableRules[selectedDesign.id] || editableRules['parent'] || {}
-            const layers = extractLayers(rules)
-            // Find layer key that matches this fieldName
-            const matchingLayerKey = Object.keys(layers).find(key => {
-              const layerData = layers[key]
-              if (isTextLayer(layerData)) {
-                const layerFieldName = layerData.fieldName || key
-                return layerFieldName === fieldName
-              }
-              return false
-            })
-            if (matchingLayerKey && layerMap[matchingLayerKey]) {
-              displayName = layerMap[matchingLayerKey].displayName
-            }
-          }
-          
-          return (
-            <div key={fieldName} className="control-group">
-              <div className="label-row">
-                <label>{displayName}</label>
-                <div className="toggle-wrapper" onClick={() => handleToggleChange(fieldName)}>
-                  <div className={`toggle-track ${useMetadata[fieldName] ? 'active' : ''}`}>
-                    <div className="toggle-thumb"></div>
-                  </div>
-                  <span className="toggle-label">Use Metadata</span>
-                </div>
-              </div>
-              <input 
-                type="text" 
-                name={fieldName}
-                value={formValues[fieldName] || ''}
-                onChange={handleInputChange}
-              />
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Image Layers Section */}
-      {imageLayers.length > 0 && (
-        <div className="control-section">
-          <h4 className="section-title">Image Layers</h4>
-
-          {imageLayers.map(({ layerKey, displayName }) => (
-            <div key={layerKey} className="control-subsection">
-              <h5 className="subsection-title">{displayName}</h5>
-              {renderPropertyControl('Layers', layerKey, 'show', 'Show', 'boolean')}
-              {renderPropertyControl('Layers', layerKey, 'publicId', 'Public ID', 'text')}
-              {renderPropertyControl('Layers', layerKey, 'width', 'Width', 'number')}
-              {renderPropertyControl('Layers', layerKey, 'height', 'Height', 'number')}
-              {renderPropertyControl('Layers', layerKey, 'x', 'X Position', 'number')}
-              {renderPropertyControl('Layers', layerKey, 'y', 'Y Position', 'number')}
-              {renderPropertyControl('Layers', layerKey, 'gravity', 'Gravity', 'select', Object.entries(GRAVITY_VALUES).map(([key, value]) => ({ label: key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1').trim(), value: value })))}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Layer Styles Section */}
-      <div className="control-section">
-        <h4 className="section-title">Layer Styles</h4>
-        
-        {textLayers.map(({ layerKey, displayName }) => {
+        {allLayers.map(({ layerKey, displayName, layerData }) => {
+          const isExpanded = localExpandedLayers.has(layerKey)
+          const isText = isTextLayer(layerData)
+          const isImage = isImageLayer(layerData)
           const layerRules = editableRules[selectedDesign.id]?.[layerKey] || {}
           
+          // Get field name for text layers
+          const fieldName = isText ? (layerData.fieldName || layerKey) : null
+          const isComputed = isText && layerData.calculation
+          const formula = isComputed ? (layerRules.calculation?.formula || layerData.calculation?.formula || '') : ''
+          const dependsOn = isComputed ? (layerData.calculation?.dependsOn || '') : ''
+          
           return (
-            <div key={layerKey} className="control-subsection">
-              <h5 className="subsection-title">{displayName}</h5>
-              
-              {/* Font */}
-              <div className="control-group">
-                <div className="label-row">
-                  <label>Font</label>
-                  {renderInheritanceIcon(displayName, 'font')}
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <select 
-                    value={layerRules.font || 'Arial'}
-                    onChange={(e) => handleRuleUpdate('Layers', displayName, 'font', e.target.value)}
-                    style={{ flex: 1 }}
+            <div 
+              key={layerKey} 
+              className={`layer-accordion ${highlightedLayer === layerKey ? 'highlighted' : ''}`}
+              data-layer-key={layerKey}
+            >
+              {/* Accordion Header */}
+              <div 
+                className="layer-accordion-header"
+                onClick={() => toggleLayer(layerKey)}
+              >
+                <div className="layer-accordion-title">
+                  <svg 
+                    className={`accordion-chevron ${isExpanded ? 'expanded' : ''}`}
+                    width="16" 
+                    height="16" 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    strokeWidth="2"
                   >
-                    {GOOGLE_FONTS.map(font => (
-                      <option key={font.value} value={font.value}>
-                        {font.name}
-                      </option>
-                    ))}
-                  </select>
-                  {renderResetButton(displayName, 'font')}
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                  <span>{displayName}</span>
                 </div>
               </div>
               
-              {/* Text Flags */}
-              <div className="control-group">
-                <div className="label-row">
-                  <label>No Overflow</label>
-                  {renderInheritanceIcon(displayName, 'flNoOverflow')}
+              {/* Accordion Content */}
+              {isExpanded && (
+                <div className="layer-accordion-content">
+                  {/* Text Value Input (first for text layers) */}
+                  {isText && (
+                    <div 
+                      className={`control-group ${highlightedField === fieldName ? 'highlighted' : ''}`}
+                      data-field-name={fieldName}
+                    >
+                      <div className="label-row">
+                        <label>Text Value</label>
+                        {!isComputed && (
+                          <div className="toggle-wrapper" onClick={() => handleToggleChange(fieldName)}>
+                            <div className={`toggle-track ${useMetadata[fieldName] ? 'active' : ''}`}>
+                              <div className="toggle-thumb"></div>
+                            </div>
+                            <span className="toggle-label">Use Metadata</span>
+                          </div>
+                        )}
+                        {isComputed && (
+                          <span className="computed-badge" style={{ fontSize: '0.75rem', color: '#888', fontStyle: 'italic' }}>
+                            Computed
+                          </span>
+                        )}
+                      </div>
+                      {isComputed ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <label style={{ fontSize: '0.75rem', color: '#888', minWidth: '80px' }}>Formula:</label>
+                            <input 
+                              type="text" 
+                              value={formula}
+                              onChange={(e) => {
+                                const currentRules = editableRules[selectedDesign.id] || editableRules['parent'] || {}
+                                const updatedRules = JSON.parse(JSON.stringify(currentRules))
+                                if (updatedRules[layerKey] && updatedRules[layerKey].calculation) {
+                                  updatedRules[layerKey].calculation.formula = e.target.value
+                                  handleRuleUpdate('Layers', displayName, 'calculation', updatedRules[layerKey].calculation)
+                                }
+                              }}
+                              placeholder="e.g., mul_1.25"
+                              style={{
+                                flex: 1,
+                                padding: '0.5rem',
+                                border: '1px solid #444',
+                                borderRadius: '4px',
+                                backgroundColor: '#2a2a2a',
+                                color: '#fff'
+                              }}
+                            />
+                          </div>
+                          {dependsOn && (
+                            <div style={{ fontSize: '0.75rem', color: '#888', fontStyle: 'italic' }}>
+                              Depends on: {dependsOn}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <input 
+                          type="text" 
+                          name={fieldName}
+                          value={formValues[fieldName] || ''}
+                          onChange={handleInputChange}
+                        />
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* Text Layer Styling Properties */}
+                  {isText && (
+                    <>
+                      {/* Font */}
+                      <div className="control-group">
+                        <div className="label-row">
+                          <label>Font</label>
+                          {renderInheritanceIcon(displayName, 'font')}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <select 
+                            value={layerRules.font || 'Arial'}
+                            onChange={(e) => handleRuleUpdate('Layers', displayName, 'font', e.target.value)}
+                            style={{ flex: 1 }}
+                          >
+                            {GOOGLE_FONTS.map(font => (
+                              <option key={font.value} value={font.value}>
+                                {font.name}
+                              </option>
+                            ))}
+                          </select>
+                          {renderResetButton(displayName, 'font')}
+                        </div>
+                      </div>
+                      
+                      {/* Font Size */}
+                      {renderPropertyControl('Layers', layerKey, 'fontSize', 'Font Size', 'text')}
+                      
+                      {/* Color */}
+                      {renderPropertyControl('Layers', layerKey, 'color', 'Color', 'color')}
+                      
+                      {/* Text Flags */}
+                      <div className="control-group">
+                        <div className="label-row">
+                          <label>No Overflow</label>
+                          {renderInheritanceIcon(displayName, 'flNoOverflow')}
+                        </div>
+                        <div className="toggle-wrapper" onClick={() => handleRuleUpdate('Layers', displayName, 'flNoOverflow', !(layerRules.flNoOverflow || false))}>
+                          <div className={`toggle-track ${layerRules.flNoOverflow ? 'active' : ''}`}>
+                            <div className="toggle-thumb"></div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="control-group">
+                        <div className="label-row">
+                          <label>Disallow Overflow</label>
+                          {renderInheritanceIcon(displayName, 'flTextDisallowOverflow')}
+                        </div>
+                        <div className="toggle-wrapper" onClick={() => handleRuleUpdate('Layers', displayName, 'flTextDisallowOverflow', !(layerRules.flTextDisallowOverflow || false))}>
+                          <div className={`toggle-track ${layerRules.flTextDisallowOverflow ? 'active' : ''}`}>
+                            <div className="toggle-thumb"></div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="control-group">
+                        <div className="label-row">
+                          <label>Text Wrap</label>
+                          {renderInheritanceIcon(displayName, 'textWrap')}
+                        </div>
+                        <div className="toggle-wrapper" onClick={() => handleRuleUpdate('Layers', displayName, 'textWrap', !(layerRules.textWrap !== false))}>
+                          <div className={`toggle-track ${layerRules.textWrap !== false ? 'active' : ''}`}>
+                            <div className="toggle-thumb"></div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Text Width */}
+                      {renderPropertyControl('Layers', layerKey, 'textWidth', 'Text Width', 'number')}
+                      
+                      {/* Position and Gravity */}
+                      {renderPropertyControl('Layers', layerKey, 'x', 'X Position', 'number')}
+                      {renderPropertyControl('Layers', layerKey, 'y', 'Y Position', 'number')}
+                      {renderPropertyControl('Layers', layerKey, 'gravity', 'Gravity', 'select', Object.entries(GRAVITY_VALUES).map(([key, value]) => ({ label: key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1').trim(), value: value })))}
+                    </>
+                  )}
+                  
+                  {/* Image Layer Properties */}
+                  {isImage && (
+                    <>
+                      {renderPropertyControl('Layers', layerKey, 'show', 'Show', 'boolean')}
+                      {layerData.publicId && renderPropertyControl('Layers', layerKey, 'publicId', 'Public ID', 'text')}
+                      {renderPropertyControl('Layers', layerKey, 'width', 'Width', 'number')}
+                      {renderPropertyControl('Layers', layerKey, 'height', 'Height', 'number')}
+                      {renderPropertyControl('Layers', layerKey, 'x', 'X Position', 'number')}
+                      {renderPropertyControl('Layers', layerKey, 'y', 'Y Position', 'number')}
+                      {renderPropertyControl('Layers', layerKey, 'gravity', 'Gravity', 'select', Object.entries(GRAVITY_VALUES).map(([key, value]) => ({ label: key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1').trim(), value: value })))}
+                    </>
+                  )}
                 </div>
-                <div className="toggle-wrapper" onClick={() => handleRuleUpdate('Layers', displayName, 'flNoOverflow', !(layerRules.flNoOverflow || false))}>
-                  <div className={`toggle-track ${layerRules.flNoOverflow ? 'active' : ''}`}>
-                    <div className="toggle-thumb"></div>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="control-group">
-                <div className="label-row">
-                  <label>Disallow Overflow</label>
-                  {renderInheritanceIcon(displayName, 'flTextDisallowOverflow')}
-                </div>
-                <div className="toggle-wrapper" onClick={() => handleRuleUpdate('Layers', displayName, 'flTextDisallowOverflow', !(layerRules.flTextDisallowOverflow || false))}>
-                  <div className={`toggle-track ${layerRules.flTextDisallowOverflow ? 'active' : ''}`}>
-                    <div className="toggle-thumb"></div>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="control-group">
-                <div className="label-row">
-                  <label>Text Wrap</label>
-                  {renderInheritanceIcon(displayName, 'textWrap')}
-                </div>
-                <div className="toggle-wrapper" onClick={() => handleRuleUpdate('Layers', displayName, 'textWrap', !(layerRules.textWrap !== false))}>
-                  <div className={`toggle-track ${layerRules.textWrap !== false ? 'active' : ''}`}>
-                    <div className="toggle-thumb"></div>
-                  </div>
-                </div>
-              </div>
+              )}
             </div>
           )
         })}

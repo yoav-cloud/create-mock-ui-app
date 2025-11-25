@@ -23,6 +23,7 @@ export default function Preview({
   urlSegments,
   highlightedRow,
   onSegmentClick,
+  onLayerIndicatorClick,
   selectedDesign,
   handleRuleUpdate,
   handleResetProperty,
@@ -97,6 +98,7 @@ export default function Preview({
             selectedDesignId={selectedDesignId}
             formValues={formValues}
             useMetadata={useMetadata}
+            onLayerIndicatorClick={onLayerIndicatorClick}
           />
         </div>
       ) : (

@@ -13,6 +13,7 @@ import './LayerIndicators.css'
  * @param {string} props.selectedDesignId - Selected design ID
  * @param {Object} props.formValues - Form values
  * @param {Object} props.useMetadata - Metadata toggle state
+ * @param {Function} props.onLayerIndicatorClick - Callback when a layer indicator is clicked
  */
 export default function LayerIndicators({
   wrapperRef,
@@ -22,7 +23,8 @@ export default function LayerIndicators({
   editableRules,
   selectedDesignId,
   formValues,
-  useMetadata
+  useMetadata,
+  onLayerIndicatorClick
 }) {
   const [overlays, setOverlays] = useState([])
 
@@ -95,6 +97,7 @@ export default function LayerIndicators({
         <div
           key={overlay.id}
           className="layer-overlay"
+          onClick={() => onLayerIndicatorClick?.(overlay.id)}
           style={{
             position: 'absolute',
             left: `${overlay.left}px`,
@@ -103,11 +106,25 @@ export default function LayerIndicators({
             height: `${overlay.height}px`,
             border: '1px solid rgba(3, 169, 244, 0.8)',
             backgroundColor: 'rgba(3, 169, 244, 0.1)',
-            pointerEvents: 'none',
+            pointerEvents: 'auto',
+            cursor: onLayerIndicatorClick ? 'pointer' : 'default',
             zIndex: 1000,
-            boxSizing: 'border-box'
+            boxSizing: 'border-box',
+            transition: 'all 0.2s ease'
           }}
-          title={overlay.name}
+          onMouseEnter={(e) => {
+            if (onLayerIndicatorClick) {
+              e.target.style.borderColor = 'rgba(3, 169, 244, 1)'
+              e.target.style.backgroundColor = 'rgba(3, 169, 244, 0.2)'
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (onLayerIndicatorClick) {
+              e.target.style.borderColor = 'rgba(3, 169, 244, 0.8)'
+              e.target.style.backgroundColor = 'rgba(3, 169, 244, 0.1)'
+            }
+          }}
+          title={onLayerIndicatorClick ? `Click to focus on ${overlay.name} in Controls` : overlay.name}
         />
       ))}
     </>

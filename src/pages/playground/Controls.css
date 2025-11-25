@@ -170,3 +170,111 @@
   background: #555;
 }
 
+/* Highlighted control group (when clicked from layer indicator) */
+.control-group.highlighted {
+  background-color: rgba(3, 169, 244, 0.1) !important;
+  box-shadow: 0 0 12px rgba(3, 169, 244, 0.4);
+  border-radius: 6px;
+  padding: 0.5rem;
+  margin: 0.5rem -0.5rem;
+  transition: all 0.4s ease;
+  transform: scale(1.02);
+}
+
+.control-group.highlighted label {
+  color: var(--active-color);
+  font-weight: 600;
+}
+
+/* Accordion Styles */
+.layer-accordion {
+  border: 1px solid #333;
+  border-radius: 6px;
+  margin-bottom: 0.75rem;
+  background-color: #2a2a2a;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.layer-accordion:last-child {
+  margin-bottom: 0;
+}
+
+.layer-accordion-header {
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #2a2a2a;
+  transition: background-color 0.2s ease;
+  user-select: none;
+}
+
+.layer-accordion-header:hover {
+  background-color: #333;
+}
+
+.layer-accordion-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #ccc;
+}
+
+.accordion-chevron {
+  transition: transform 0.2s ease;
+  color: #888;
+  flex-shrink: 0;
+}
+
+.accordion-chevron.expanded {
+  transform: rotate(180deg);
+}
+
+.layer-accordion-content {
+  padding: 0.75rem 1rem;
+  border-top: 1px solid #333;
+  background-color: #252525;
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    max-height: 2000px;
+  }
+}
+
+.layer-accordion-content .control-group {
+  margin-bottom: 0.75rem;
+}
+
+.layer-accordion-content .control-group:last-child {
+  margin-bottom: 0;
+}
+
+/* Highlighted accordion (when clicked from layer indicator) */
+.layer-accordion.highlighted {
+  background-color: rgba(3, 169, 244, 0.2) !important;
+  box-shadow: 0 0 12px rgba(3, 169, 244, 0.4);
+  border-color: var(--active-color);
+  transform: scale(1.01);
+  transition: all 0.4s ease;
+}
+
+.layer-accordion.highlighted .layer-accordion-header {
+  background-color: rgba(3, 169, 244, 0.15);
+}
+
+.layer-accordion.highlighted .layer-accordion-title {
+  color: #fff;
+  font-weight: 600;
+}
+

@@ -12,7 +12,7 @@ import { extractMetadataId, hasMetadataSyntax, getMetadataKey } from '../utils/m
 import { escapeCloudinaryString, getDefaultValue, shouldUseMetadata, getMetaKeyForField, getBackgroundColorValue } from '../utils/cloudinaryUtils'
 import { buildCloudinaryTransform } from '../utils/cloudinaryTransformBuilder'
 import { getAllFieldNames, getFieldDefaultValue, getFieldMetadataSyntax } from '../utils/fieldMetadataUtils'
-import { extractLayers, isTextLayer } from '../utils/layerUtils'
+import { extractLayers, isTextLayer, isImageLayer } from '../utils/layerUtils'
 
 function DesignPlayground() {
   const [selectedAsset, setSelectedAsset] = useState(() => {
@@ -58,6 +58,9 @@ function DesignPlayground() {
 
   // Highlighted row state for URL preview interaction
   const [highlightedRow, setHighlightedRow] = useState(null)
+  const [highlightedField, setHighlightedField] = useState(null)
+  const [expandedLayers, setExpandedLayers] = useState(() => new Set())
+  const [highlightedLayer, setHighlightedLayer] = useState(null) // For highlighting accordion
 
   // Layer overlay toggle state (default off)
   const [showLayerOverlays, setShowLayerOverlays] = useState(false)
@@ -436,6 +439,42 @@ function DesignPlayground() {
     }
   }
 
+  // Handle layer indicator click - expand accordion, highlight accordion, and highlight field
+  const handleLayerIndicatorClick = useCallback((layerKey) => {
+    if (!layerKey) return
+
+    // Expand the accordion for this layer
+    setExpandedLayers(prev => {
+      const newExpanded = new Set(prev)
+      newExpanded.add(layerKey)
+      return newExpanded
+    })
+
+    // Highlight the accordion
+    setHighlightedLayer(layerKey)
+    setTimeout(() => {
+      setHighlightedLayer(null)
+    }, 2000)
+
+    // Find the field name for this layer
+    const rules = editableRules[selectedDesign.id] || editableRules['parent'] || {}
+    const layers = extractLayers(rules)
+    const layerData = layers[layerKey]
+    
+    if (layerData && isTextLayer(layerData)) {
+      const fieldName = layerData.fieldName || layerKey
+      
+      // Highlight the field
+      setHighlightedField(fieldName)
+      setTimeout(() => {
+        setHighlightedField(null)
+      }, 2000)
+    } else if (layerData && isImageLayer(layerData)) {
+      // For image layers, just expand the accordion (no field to highlight)
+      // The accordion expansion above handles this
+    }
+  }, [editableRules, selectedDesign.id])
+
   // Apply/remove highlighted class to table rows
   useEffect(() => {
     // Remove all highlights first
@@ -624,6 +663,9 @@ function DesignPlayground() {
           } else if (key === 'textWidth') {
             // textWidth: number value
             convertedValue = parseInt(value) || 0
+          } else if (key === 'calculation') {
+            // calculation: object value (for computed fields)
+            convertedValue = value
           }
 
           newRules[designId][layerKey][key] = convertedValue
@@ -935,6 +977,7 @@ function DesignPlayground() {
           urlSegments={urlSegments}
           highlightedRow={highlightedRow}
           onSegmentClick={handleSegmentClick}
+          onLayerIndicatorClick={handleLayerIndicatorClick}
           selectedDesign={selectedDesign}
           handleRuleUpdate={handleRuleUpdate}
           handleResetProperty={handleResetProperty}
@@ -965,6 +1008,10 @@ function DesignPlayground() {
           isPropertyOverriddenForDisplay={isPropertyOverriddenForDisplay}
           wouldPropertyBeInherited={wouldPropertyBeInherited}
           layerMap={layerMap}
+          highlightedField={highlightedField}
+          expandedLayers={expandedLayers}
+          setExpandedLayers={setExpandedLayers}
+          highlightedLayer={highlightedLayer}
         />
       </div>
     </div>
