@@ -71,10 +71,35 @@ export default function LayerIndicators({
     }
   }, [updateOverlays, showLayerOverlays, wrapperRef])
   
-  // Update overlays when relevant props change
+  // Update overlays when relevant props change (immediate update for responsiveness)
   useEffect(() => {
     updateOverlays()
-  }, [canvasDimensions, editableRules, selectedDesignId, updateOverlays])
+  }, [canvasDimensions, editableRules, updateOverlays])
+  
+  // When design changes, wait for CSS transition to complete before recalculating
+  useEffect(() => {
+    if (showLayerOverlays) {
+      // Wait for wrapper's CSS transition (0.3s) plus buffer
+      const timer = setTimeout(() => {
+        updateOverlays()
+      }, 400)
+      return () => clearTimeout(timer)
+    }
+  }, [selectedDesignId, showLayerOverlays, updateOverlays])
+  
+  // Update overlays when image finishes loading
+  // This ensures we recalculate after a new image loads (e.g., after switching designs)
+  useEffect(() => {
+    if (!imageLoading && showLayerOverlays) {
+      // Delay to ensure:
+      // 1. The image dimensions are available
+      // 2. The wrapper's CSS transition has completed (0.3s transition in Preview.css)
+      const timer = setTimeout(() => {
+        updateOverlays()
+      }, 350)
+      return () => clearTimeout(timer)
+    }
+  }, [imageLoading, showLayerOverlays, updateOverlays])
 
   // Debug: Log when modifiedLayers or imageLoading changes
   useEffect(() => {
