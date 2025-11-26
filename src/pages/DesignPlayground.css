@@ -1,7 +1,6 @@
 /* DesignPlayground.css */
 
 @import './DesignPlaygroundToggles.css';
-@import './playground/PlaygroundHeader.css';
 @import './playground/DesignSelector.css';
 @import './playground/Preview.css';
 @import './playground/Controls.css';
@@ -23,11 +22,67 @@
   left: 0;
 }
 
+.playground-top-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 2rem;
+  border-bottom: 1px solid #333;
+  background-color: #111;
+  z-index: 2;
+}
+
+.playground-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.playground-nav-title h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.playground-nav-links {
+  display: inline-flex;
+  gap: 0.5rem;
+  background-color: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 999px;
+  padding: 0.25rem;
+}
+
+.playground-nav-link {
+  padding: 0.35rem 1.2rem;
+  border-radius: 999px;
+  color: #bbb;
+  text-decoration: none;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+
+.playground-nav-link:hover {
+  color: #fff;
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.playground-nav-link.active {
+  background-color: var(--active-color);
+  color: #fff;
+}
+
+.playground-route-shell {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
 .playground-content {
   display: flex;
   flex: 1;
   overflow: hidden;
-  height: calc(100% - 100px); /* Full height minus header */
+  height: 100%;
 }
 
 /* Left Sidebar */

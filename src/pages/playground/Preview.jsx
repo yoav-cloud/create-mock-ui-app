@@ -39,15 +39,16 @@ export default function Preview({
 }) {
   return (
     <div className="preview-area">
-      {/* Tab Switcher */}
       <div className="preview-tabs">
         <button
+          type="button"
           className={`preview-tab ${previewTab === 'visual' ? 'active' : ''}`}
           onClick={() => onTabChange('visual')}
         >
           Visual
         </button>
         <button
+          type="button"
           className={`preview-tab ${previewTab === 'textual' ? 'active' : ''}`}
           onClick={() => onTabChange('textual')}
         >
@@ -56,8 +57,8 @@ export default function Preview({
       </div>
 
       {previewTab === 'visual' ? (
-        <div 
-          className="preview-wrapper" 
+        <div
+          className="preview-wrapper"
           ref={previewWrapperRef}
           style={{ aspectRatio: `${canvasDimensions.width}/${canvasDimensions.height}` }}
         >
@@ -66,19 +67,17 @@ export default function Preview({
               <div className="spinner"></div>
             </div>
           )}
-          {/* Background image (previous successful load) */}
           {currentImageUrl && currentImageUrl !== generatedUrl && !imageError && (
-             <img 
-             src={currentImageUrl} 
-             alt="Design Preview Previous" 
-             className="preview-image previous"
-           />
+            <img
+              src={currentImageUrl}
+              alt="Design Preview Previous"
+              className="preview-image previous"
+            />
           )}
-          {/* Foreground image (loading) */}
           {!imageError ? (
-            <img 
-              src={generatedUrl} 
-              alt="Design Preview" 
+            <img
+              src={generatedUrl}
+              alt="Design Preview"
               className={`preview-image current ${imageLoading ? 'loading' : ''}`}
               onLoad={onImageLoad}
               onError={onImageError}
@@ -89,22 +88,21 @@ export default function Preview({
               <div className="broken-text">Image failed to load</div>
             </div>
           )}
-          
-          {/* Layer Indicators */}
-              <LayerIndicators
-                wrapperRef={previewWrapperRef}
-                showLayerOverlays={showLayerOverlays}
-                onToggleLayerOverlays={onToggleLayerOverlays}
-                canvasDimensions={canvasDimensions}
-                editableRules={editableRules}
-                selectedDesignId={selectedDesignId}
-                formValues={formValues}
-                useMetadata={useMetadata}
-                onLayerIndicatorClick={onLayerIndicatorClick}
-                imageLoading={imageLoading}
-                modifiedLayers={modifiedLayers}
-                hoveredLayerFromPanel={hoveredLayerFromPanel}
-              />
+
+          <LayerIndicators
+            wrapperRef={previewWrapperRef}
+            showLayerOverlays={showLayerOverlays}
+            onToggleLayerOverlays={onToggleLayerOverlays}
+            canvasDimensions={canvasDimensions}
+            editableRules={editableRules}
+            selectedDesignId={selectedDesignId}
+            formValues={formValues}
+            useMetadata={useMetadata}
+            onLayerIndicatorClick={onLayerIndicatorClick}
+            imageLoading={imageLoading}
+            modifiedLayers={modifiedLayers}
+            hoveredLayerFromPanel={hoveredLayerFromPanel}
+          />
         </div>
       ) : (
         <div className="textual-preview">

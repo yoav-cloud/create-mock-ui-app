@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { DesignProvider } from './context/DesignContext'
 import { ProjectProvider } from './context/ProjectContext'
@@ -12,6 +12,8 @@ import Editor from './pages/Editor'
 import BrandCenter from './pages/BrandCenter'
 import Preferences from './pages/Preferences'
 import DesignPlayground from './pages/DesignPlayground'
+import PlaygroundDesignView from './pages/playground/PlaygroundDesignView'
+import PlaygroundReviewView from './pages/playground/PlaygroundReviewView'
 
 function App() {
   return (
@@ -28,7 +30,12 @@ function App() {
             <Route path="/editor/:designId" element={<Editor />} />
             <Route path="/brand-center" element={<BrandCenter />} />
             <Route path="/preferences" element={<Preferences />} />
-            <Route path="/playground" element={<DesignPlayground />} />
+            <Route path="/playground" element={<Navigate to="/playground/design" replace />} />
+            <Route path="/playground/*" element={<DesignPlayground />}>
+              <Route index element={<Navigate to="design" replace />} />
+              <Route path="design" element={<PlaygroundDesignView />} />
+              <Route path="review" element={<PlaygroundReviewView />} />
+            </Route>
           </Routes>
           <Toaster 
             position="top-right"

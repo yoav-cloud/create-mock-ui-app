@@ -1,12 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { NavLink, Outlet } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import './DesignPlayground.css'
 import { ASSETS, DESIGN_TYPES, DESIGN_RULES, GRAVITY_VALUES, GOOGLE_FONTS, LIGHT_BLUE, BASE_WIDTH, CLOUDINARY_BASE_URL } from './playground/constants'
-import PlaygroundHeader from './playground/PlaygroundHeader'
-import DesignSelector from './playground/DesignSelector'
-import Preview from './playground/Preview'
-import Controls from './playground/Controls'
-import TextualPreview from './playground/TextualPreview'
+import AssetSwitcher from './playground/AssetSwitcher'
 import { parseUrlSegments as parseUrlSegmentsUtil, generateLayerConfig, extractLayersFromRules } from '../utils/urlParser'
 import { extractMetadataId, hasMetadataSyntax, getMetadataKey } from '../utils/metadataUtils'
 import { escapeCloudinaryString, getDefaultValue, shouldUseMetadata, getMetaKeyForField, getBackgroundColorValue } from '../utils/cloudinaryUtils'
@@ -57,6 +54,8 @@ function DesignPlayground() {
 
   // Preview tab state (visual or textual)
   const [previewTab, setPreviewTab] = useState('visual')
+  const [reviewMode, setReviewMode] = useState('grid')
+  const [activeReviewDesignId, setActiveReviewDesignId] = useState('parent')
 
   // Highlighted row state for URL preview interaction
   const [highlightedRow, setHighlightedRow] = useState(null)
@@ -339,7 +338,7 @@ function DesignPlayground() {
   }, [formValues, useMetadata])
 
   // Helper to build the logic for one field
-  const buildFieldLogicLocal = (varName, metaKey, defaultValue, isNumber = false) => {
+  const buildFieldLogicLocal = useCallback((varName, metaKey, defaultValue, isNumber = false) => {
     // Format default value
     const safeDefault = (defaultValue && String(defaultValue).trim() !== '')
       ? defaultValue
@@ -377,20 +376,29 @@ function DesignPlayground() {
 
       return parts.join('/')
     }
-  }
+  }, [debouncedValues, debouncedUseMetadata])
 
-  const getTransformedUrl = () => {
-    // Get positioning rules for the selected design type (use editable rules)
-    const rules = editableRules[selectedDesign.id] || editableRules['parent']
+  const buildDesignPreviewUrl = useCallback((designObj, dimensionsOverride = null) => {
+    if (!designObj) return ''
+
+    const rules = editableRules[designObj.id]
+      || DESIGN_RULES[designObj.id]
+      || editableRules['parent']
+      || DESIGN_RULES['parent']
+
+    const resolvedDimensions = dimensionsOverride || {
+      width: rules?.width || designObj.width || BASE_WIDTH,
+      height: rules?.height || designObj.height || BASE_WIDTH
+    }
 
     return buildCloudinaryTransform({
       rules,
-      canvasDimensions,
+      canvasDimensions: resolvedDimensions,
       formValues: debouncedValues,
       useMetadata: debouncedUseMetadata,
       savedValues,
       selectedAsset,
-      selectedDesign,
+      selectedDesign: designObj,
       baseWidth: BASE_WIDTH,
       getDefaultValue: (fieldName) => getDefaultValue(fieldName, debouncedValues, debouncedUseMetadata, savedValues),
       shouldUseMetadata,
@@ -398,9 +406,55 @@ function DesignPlayground() {
       getBackgroundColorValue: () => getBackgroundColorValue(debouncedValues, debouncedUseMetadata, savedValues),
       buildFieldLogicLocal
     })
-  }
+  }, [
+    editableRules,
+    debouncedValues,
+    debouncedUseMetadata,
+    savedValues,
+    selectedAsset,
+    buildFieldLogicLocal
+  ])
+
+  const getTransformedUrl = useCallback(() => {
+    return buildDesignPreviewUrl(selectedDesign, canvasDimensions)
+  }, [buildDesignPreviewUrl, selectedDesign, canvasDimensions])
 
   const generatedUrl = getTransformedUrl()
+
+  const reviewPreviews = useMemo(() => {
+    return DESIGN_TYPES.map(design => {
+      const rules = editableRules[design.id] || DESIGN_RULES[design.id] || {}
+      const width = rules.width || design.width || BASE_WIDTH
+      const height = rules.height || design.height || BASE_WIDTH
+
+      return {
+        design,
+        url: buildDesignPreviewUrl(design, { width, height }),
+        width,
+        height
+      }
+    })
+  }, [buildDesignPreviewUrl, editableRules])
+
+  useEffect(() => {
+    if (!reviewPreviews.length) return
+    const exists = reviewPreviews.some(preview => preview.design.id === activeReviewDesignId)
+    if (!exists) {
+      setActiveReviewDesignId(reviewPreviews[0].design.id)
+    }
+  }, [reviewPreviews, activeReviewDesignId])
+
+  const handleReviewDesignSelect = useCallback((designId) => {
+    setActiveReviewDesignId(designId)
+  }, [])
+
+  const handleReviewCarouselNavigate = useCallback((direction) => {
+    if (!reviewPreviews.length) return
+    const currentIndex = reviewPreviews.findIndex(preview => preview.design.id === activeReviewDesignId)
+    const safeIndex = currentIndex === -1 ? 0 : currentIndex
+    const nextIndex = (safeIndex + direction + reviewPreviews.length) % reviewPreviews.length
+    setActiveReviewDesignId(reviewPreviews[nextIndex].design.id)
+  }, [reviewPreviews, activeReviewDesignId])
 
   // Extract layers from rules dynamically
   const layerMap = useMemo(() => {
@@ -562,6 +616,18 @@ function DesignPlayground() {
       key => layerMap[key].displayName === layerName
     )
     return found || null
+  }, [layerMap])
+
+  const getLayerKeyByFieldName = useCallback((fieldName) => {
+    if (!fieldName || !layerMap) return null
+    return Object.keys(layerMap).find(key => {
+      const layer = layerMap[key]?.layerData
+      if (!layer) return false
+      if (layer.fieldName) {
+        return layer.fieldName === fieldName
+      }
+      return key === fieldName
+    }) || null
   }, [layerMap])
 
   // Helper to check if a property is inherited (for display)
@@ -857,81 +923,115 @@ function DesignPlayground() {
 
 
 
+  const focusLayerInDesign = useCallback((fieldName) => {
+    if (!fieldName) return
+    setHighlightedField(fieldName)
+    const layerKey = getLayerKeyByFieldName(fieldName)
+    if (layerKey) {
+      setHighlightedLayer(layerKey)
+      setExpandedLayers(prev => {
+        const next = new Set(prev)
+        next.add(layerKey)
+        return next
+      })
+    }
+  }, [getLayerKeyByFieldName])
+
+  const designContext = {
+    selectedAsset,
+    setSelectedAsset,
+    selectedDesign,
+    setSelectedDesign,
+    canvasDimensions,
+    setCanvasDimensions,
+    inheritanceToggles,
+    setInheritanceToggles,
+    previewTab,
+    setPreviewTab,
+    previewWrapperRef,
+    imageLoading,
+    imageError,
+    currentImageUrl,
+    generatedUrl,
+    handleImageLoad,
+    handleImageError,
+    showLayerOverlays,
+    setShowLayerOverlays,
+    editableRules,
+    formValues,
+    useMetadata,
+    urlSegments,
+    highlightedRow,
+    handleSegmentClick,
+    handleLayerIndicatorClick,
+    modifiedLayers,
+    handleRuleUpdate,
+    handleResetProperty,
+    isPropertyInherited,
+    isPropertyOverriddenForDisplay,
+    wouldPropertyBeInherited,
+    getFieldType,
+    getGravityOptions,
+    getFontOptions,
+    handleFontSizeValidation,
+    hoveredLayerFromPanel,
+    setHoveredLayerFromPanel,
+    copySuccess,
+    handleInputChange,
+    handleToggleChange,
+    handleCopy,
+    getTransformedUrl,
+    layerMap,
+    highlightedField,
+    expandedLayers,
+    setExpandedLayers,
+    highlightedLayer
+  }
+
+  const reviewContext = {
+    reviewMode,
+    setReviewMode,
+    reviewPreviews,
+    activeReviewDesignId,
+    handleReviewDesignSelect,
+    handleReviewCarouselNavigate,
+    formValues,
+    handleInputChange,
+    layerMap,
+    focusLayerInDesign
+  }
+
   return (
     <div className="playground-container">
-      <PlaygroundHeader
-        selectedAsset={selectedAsset}
-        onAssetChange={setSelectedAsset}
-      />
+      <div className="playground-top-nav">
+        <div className="playground-nav-title">
+          <h2>Design Playground</h2>
+        </div>
+        <div className="playground-nav-actions">
+          <div className="playground-nav-links">
+            <NavLink
+              to="/playground/design"
+              end
+              className={({ isActive }) => `playground-nav-link ${isActive ? 'active' : ''}`}
+            >
+              Design
+            </NavLink>
+            <NavLink
+              to="/playground/review"
+              className={({ isActive }) => `playground-nav-link ${isActive ? 'active' : ''}`}
+            >
+              Review
+            </NavLink>
+          </div>
+          <AssetSwitcher
+            selectedAsset={selectedAsset}
+            onAssetChange={setSelectedAsset}
+          />
+        </div>
+      </div>
 
-      <div className="playground-content">
-        <DesignSelector
-          selectedDesign={selectedDesign}
-          onDesignChange={setSelectedDesign}
-          canvasDimensions={canvasDimensions}
-          inheritanceToggles={inheritanceToggles}
-          onInheritanceToggleChange={setInheritanceToggles}
-        />
-
-        <Preview
-          previewTab={previewTab}
-          onTabChange={setPreviewTab}
-          canvasDimensions={canvasDimensions}
-          previewWrapperRef={previewWrapperRef}
-          imageLoading={imageLoading}
-          imageError={imageError}
-          currentImageUrl={currentImageUrl}
-          generatedUrl={generatedUrl}
-          onImageLoad={handleImageLoad}
-          onImageError={handleImageError}
-          showLayerOverlays={showLayerOverlays}
-          onToggleLayerOverlays={setShowLayerOverlays}
-          editableRules={editableRules}
-          selectedDesignId={selectedDesign.id}
-          formValues={formValues}
-          useMetadata={useMetadata}
-          urlSegments={urlSegments}
-          highlightedRow={highlightedRow}
-          onSegmentClick={handleSegmentClick}
-          onLayerIndicatorClick={handleLayerIndicatorClick}
-          modifiedLayers={modifiedLayers}
-          selectedDesign={selectedDesign}
-          handleRuleUpdate={handleRuleUpdate}
-          handleResetProperty={handleResetProperty}
-          isPropertyInherited={isPropertyInherited}
-          isPropertyOverriddenForDisplay={isPropertyOverriddenForDisplay}
-          wouldPropertyBeInherited={wouldPropertyBeInherited}
-          getFieldType={getFieldType}
-          getGravityOptions={getGravityOptions}
-          getFontOptions={getFontOptions}
-          handleFontSizeValidation={handleFontSizeValidation}
-          hoveredLayerFromPanel={hoveredLayerFromPanel}
-        />
-
-        <Controls
-          canvasDimensions={canvasDimensions}
-          setCanvasDimensions={setCanvasDimensions}
-          formValues={formValues}
-          useMetadata={useMetadata}
-          editableRules={editableRules}
-          selectedDesign={selectedDesign}
-          copySuccess={copySuccess}
-          handleInputChange={handleInputChange}
-          handleToggleChange={handleToggleChange}
-          handleRuleUpdate={handleRuleUpdate}
-          handleResetProperty={handleResetProperty}
-          handleCopy={handleCopy}
-          getTransformedUrl={getTransformedUrl}
-          isPropertyInherited={isPropertyInherited}
-          isPropertyOverriddenForDisplay={isPropertyOverriddenForDisplay}
-          wouldPropertyBeInherited={wouldPropertyBeInherited}
-          layerMap={layerMap}
-          highlightedField={highlightedField}
-          expandedLayers={expandedLayers}
-          setExpandedLayers={setExpandedLayers}
-          highlightedLayer={highlightedLayer}
-          onLayerHover={setHoveredLayerFromPanel}
-        />
+      <div className="playground-route-shell">
+        <Outlet context={{ design: designContext, review: reviewContext }} />
       </div>
     </div>
   )
