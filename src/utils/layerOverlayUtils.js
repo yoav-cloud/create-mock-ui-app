@@ -96,18 +96,6 @@ export function calculateLayerOverlays({
   const imageOffsetX = (imageRect.left - wrapperRect.left) + contentOffsetX
   const imageOffsetY = (imageRect.top - wrapperRect.top) + contentOffsetY
   
-  // Debug logging
-  console.log('Layer Overlay Debug:', {
-    selectedDesignId,
-    intrinsic: { width: intrinsicWidth, height: intrinsicHeight },
-    expected: { width: expectedWidth, height: expectedHeight },
-    displayed: { width: displayedImageWidth, height: displayedImageHeight },
-    imageOffset: { x: imageOffsetX, y: imageOffsetY },
-    displayScale: scale,
-    rulesScale,
-    BASE_WIDTH
-  })
-  
   // Extract all layers dynamically
   const layers = extractLayers(rules)
   
@@ -204,11 +192,6 @@ export function calculateLayerOverlays({
         imageOffsetX,
         imageOffsetY
       )
-      console.log(`Layer ${layerKey}:`, {
-        rules: { x: layerData.x, y: layerData.y, gravity: layerData.gravity },
-        scaled: { x: scaledX, y: scaledY },
-        calculated: { left: pos.left, top: pos.top, width: layerW, height: layerH }
-      })
       newOverlays.push({
         id: layerKey,
         name: displayName,
@@ -245,11 +228,6 @@ export function calculateLayerOverlays({
         imageOffsetX,
         imageOffsetY
       )
-      console.log(`Layer ${layerKey}:`, {
-        rules: { x: layerData.x, y: layerData.y, gravity: layerData.gravity, width: layerData.width, height: layerData.height },
-        scaled: { x: scaledX, y: scaledY, width: scaledWidth, height: scaledHeight },
-        calculated: { left: pos.left, top: pos.top, width: imgW, height: imgH }
-      })
       newOverlays.push({
         id: layerKey,
         name: displayName,

@@ -34,7 +34,8 @@ export default function Preview({
   getFieldType,
   getGravityOptions,
   getFontOptions,
-  handleFontSizeValidation
+  handleFontSizeValidation,
+  hoveredLayerFromPanel
 }) {
   return (
     <div className="preview-area">
@@ -102,6 +103,7 @@ export default function Preview({
                 onLayerIndicatorClick={onLayerIndicatorClick}
                 imageLoading={imageLoading}
                 modifiedLayers={modifiedLayers}
+                hoveredLayerFromPanel={hoveredLayerFromPanel}
               />
         </div>
       ) : (

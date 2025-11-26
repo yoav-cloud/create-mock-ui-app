@@ -25,7 +25,8 @@ export default function Controls({
   highlightedField,
   expandedLayers,
   setExpandedLayers,
-  highlightedLayer
+  highlightedLayer,
+  onLayerHover
 }) {
   // Get all layers in order from design_rules
   const allLayers = useMemo(() => {
@@ -502,6 +503,8 @@ export default function Controls({
               key={layerKey} 
               className={`layer-accordion ${highlightedLayer === layerKey ? 'highlighted' : ''}`}
               data-layer-key={layerKey}
+              onMouseEnter={() => onLayerHover?.(layerKey)}
+              onMouseLeave={() => onLayerHover?.(null)}
             >
               {/* Accordion Header */}
               <div 

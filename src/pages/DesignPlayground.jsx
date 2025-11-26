@@ -63,6 +63,7 @@ function DesignPlayground() {
   const [highlightedField, setHighlightedField] = useState(null)
   const [expandedLayers, setExpandedLayers] = useState(() => new Set())
   const [highlightedLayer, setHighlightedLayer] = useState(null) // For highlighting accordion
+  const [hoveredLayerFromPanel, setHoveredLayerFromPanel] = useState(null) // For hover sync between panel and indicators
 
   // Layer overlay toggle state (default off)
   const [showLayerOverlays, setShowLayerOverlays] = useState(false)
@@ -904,6 +905,7 @@ function DesignPlayground() {
           getGravityOptions={getGravityOptions}
           getFontOptions={getFontOptions}
           handleFontSizeValidation={handleFontSizeValidation}
+          hoveredLayerFromPanel={hoveredLayerFromPanel}
         />
 
         <Controls
@@ -928,6 +930,7 @@ function DesignPlayground() {
           expandedLayers={expandedLayers}
           setExpandedLayers={setExpandedLayers}
           highlightedLayer={highlightedLayer}
+          onLayerHover={setHoveredLayerFromPanel}
         />
       </div>
     </div>
