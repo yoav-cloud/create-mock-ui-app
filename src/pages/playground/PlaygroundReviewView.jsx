@@ -36,41 +36,58 @@ export default function PlaygroundReviewView() {
     )
   }
 
-  const [loadedDesigns, setLoadedDesigns] = useState(() => new Set())
+  const [loadedDesigns, setLoadedDesigns] = useState(() => new Map())
   const [isLoading, setIsLoading] = useState(false)
   const [isCopyPanelOpen, setIsCopyPanelOpen] = useState(false)
-
-  useEffect(() => {
-    if (!reviewPreviews.length) {
-      setIsLoading(false)
-      setLoadedDesigns(new Set())
-      return
-    }
-    setIsLoading(true)
-    setLoadedDesigns(new Set())
-  }, [reviewPreviews])
-
-  const handlePreviewImageLoad = useCallback((designId) => {
-    setLoadedDesigns(prev => {
-      if (prev.has(designId)) return prev
-      const next = new Set(prev)
-      next.add(designId)
-      if (next.size === reviewPreviews.length) {
-        setIsLoading(false)
-      }
-      return next
-    })
-  }, [reviewPreviews.length])
-
-  const handlePreviewImageError = useCallback((designId) => {
-    handlePreviewImageLoad(designId)
-  }, [handlePreviewImageLoad])
 
   const fallbackPreview = reviewPreviews[0]
   const selected = reviewPreviews.find(preview => preview.design.id === activeReviewDesignId) || fallbackPreview
   const currentIndex = reviewPreviews.findIndex(preview => preview.design.id === selected.design.id)
   const safeIndex = currentIndex === -1 ? 0 : currentIndex
   const humanIndex = safeIndex + 1
+
+  const activePreviews = useMemo(() => {
+    if (!reviewPreviews.length) return []
+    if (reviewMode === 'grid') {
+      return reviewPreviews
+    }
+    return selected ? [selected] : []
+  }, [reviewMode, reviewPreviews, selected])
+
+  useEffect(() => {
+    setLoadedDesigns(prev => {
+      const next = new Map()
+      activePreviews.forEach(({ design, url }) => {
+        const prevUrl = prev.get(design.id)
+        if (prevUrl && prevUrl === url) {
+          next.set(design.id, url)
+        }
+      })
+      return next
+    })
+  }, [activePreviews])
+
+  useEffect(() => {
+    if (!activePreviews.length) {
+      setIsLoading(false)
+      return
+    }
+    const allLoaded = activePreviews.every(({ design, url }) => loadedDesigns.get(design.id) === url)
+    setIsLoading(!allLoaded)
+  }, [activePreviews, loadedDesigns])
+
+  const handlePreviewImageLoad = useCallback((designId, url) => {
+    setLoadedDesigns(prev => {
+      if (prev.get(designId) === url) return prev
+      const next = new Map(prev)
+      next.set(designId, url)
+      return next
+    })
+  }, [])
+
+  const handlePreviewImageError = useCallback((designId, url) => {
+    handlePreviewImageLoad(designId, url)
+  }, [handlePreviewImageLoad])
 
   const textLayers = useMemo(() => {
     if (!layerMap) return []
@@ -147,8 +164,8 @@ export default function PlaygroundReviewView() {
                         <img
                           src={url}
                           alt={`${design.name} preview`}
-                          onLoad={() => handlePreviewImageLoad(design.id)}
-                          onError={() => handlePreviewImageError(design.id)}
+                          onLoad={() => handlePreviewImageLoad(design.id, url)}
+                          onError={() => handlePreviewImageError(design.id, url)}
                         />
                       </div>
                       <div className="review-grid-label">
@@ -176,8 +193,8 @@ export default function PlaygroundReviewView() {
                     <img
                       src={selected.url}
                       alt={`${selected.design.name} large preview`}
-                      onLoad={() => handlePreviewImageLoad(selected.design.id)}
-                      onError={() => handlePreviewImageError(selected.design.id)}
+                      onLoad={() => handlePreviewImageLoad(selected.design.id, selected.url)}
+                      onError={() => handlePreviewImageError(selected.design.id, selected.url)}
                     />
                   </div>
                 </div>
@@ -200,16 +217,30 @@ export default function PlaygroundReviewView() {
                   &lt;
                 </button>
                 <div className="carousel-stage">
-                  <div
-                    className="carousel-frame"
-                    style={{ aspectRatio: `${selected.width}/${selected.height}` }}
-                  >
-                    <img
-                      src={selected.url}
-                      alt={`${selected.design.name} carousel preview`}
-                      onLoad={() => handlePreviewImageLoad(selected.design.id)}
-                      onError={() => handlePreviewImageError(selected.design.id)}
-                    />
+                  <div className="carousel-stage-content">
+                    <div className="review-detail-header">
+                      <div>
+                        <p className="review-detail-eyebrow">Selected design</p>
+                        <h4>{selected.design.name}</h4>
+                      </div>
+                      <span className="review-detail-dimensions">{selected.width}x{selected.height}</span>
+                    </div>
+                    <div
+                      className="carousel-frame"
+                      style={{ aspectRatio: `${selected.width}/${selected.height}` }}
+                    >
+                      <img
+                        src={selected.url}
+                        alt={`${selected.design.name} carousel preview`}
+                        onLoad={() => handlePreviewImageLoad(selected.design.id, selected.url)}
+                        onError={() => handlePreviewImageError(selected.design.id, selected.url)}
+                      />
+                    </div>
+                    {selected.design.description && (
+                      <p className="review-detail-description">
+                        {selected.design.description}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <button
