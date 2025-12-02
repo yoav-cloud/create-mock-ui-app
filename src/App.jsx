@@ -14,6 +14,7 @@ import Preferences from './pages/Preferences'
 import DesignPlayground from './pages/DesignPlayground'
 import PlaygroundDesignView from './pages/playground/PlaygroundDesignView'
 import PlaygroundReviewView from './pages/playground/PlaygroundReviewView'
+import FigmaAuthRedirect from './pages/playground/FigmaAuthRedirect'
 
 function App() {
   return (
@@ -31,6 +32,7 @@ function App() {
             <Route path="/brand-center" element={<BrandCenter />} />
             <Route path="/preferences" element={<Preferences />} />
             <Route path="/playground" element={<Navigate to="/playground/design" replace />} />
+            <Route path="/playground/figma-auth" element={<FigmaAuthRedirect />} />
             <Route path="/playground/*" element={<DesignPlayground />}>
               <Route index element={<Navigate to="design" replace />} />
               <Route path="design" element={<PlaygroundDesignView />} />

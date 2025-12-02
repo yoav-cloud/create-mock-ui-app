@@ -12,6 +12,7 @@ import { getAllFieldNames, getFieldDefaultValue, getFieldMetadataSyntax } from '
 import { extractLayers, isTextLayer, isImageLayer } from '../utils/layerUtils'
 import { shouldInheritProperty } from '../utils/inheritanceUtils'
 import { createRuleUpdateHandler } from '../utils/ruleUpdateUtils'
+import FigmaImportModal from './playground/FigmaImportModal'
 
 function DesignPlayground() {
   const [selectedAsset, setSelectedAsset] = useState(() => {
@@ -23,6 +24,8 @@ function DesignPlayground() {
     const saved = localStorage.getItem('playground_design')
     return saved ? DESIGN_TYPES.find(d => d.id === saved) || DESIGN_TYPES[0] : DESIGN_TYPES[0]
   })
+
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
 
   const [formValues, setFormValues] = useState(() => {
     const saved = localStorage.getItem('playground_form')
@@ -937,6 +940,20 @@ function DesignPlayground() {
     }
   }, [getLayerKeyByFieldName])
 
+  const isLocalEnvironment = useMemo(() => {
+    if (typeof window === 'undefined') {
+      return import.meta.env.DEV
+    }
+    const host = window.location.hostname
+    return host === 'localhost' || host === '127.0.0.1' || host.endsWith('.local')
+  }, [])
+
+  useEffect(() => {
+    if (!isLocalEnvironment) {
+      setIsImportModalOpen(false)
+    }
+  }, [isLocalEnvironment])
+
   const designContext = {
     selectedAsset,
     setSelectedAsset,
@@ -1006,6 +1023,15 @@ function DesignPlayground() {
       <div className="playground-top-nav">
         <div className="playground-nav-title">
           <h2>Design Playground</h2>
+          {isLocalEnvironment && (
+            <button
+              type="button"
+              className="playground-new-btn"
+              onClick={() => setIsImportModalOpen(true)}
+            >
+              New
+            </button>
+          )}
         </div>
         <div className="playground-nav-actions">
           <div className="playground-nav-links">
@@ -1033,6 +1059,12 @@ function DesignPlayground() {
       <div className="playground-route-shell">
         <Outlet context={{ design: designContext, review: reviewContext }} />
       </div>
+      {isLocalEnvironment && (
+        <FigmaImportModal
+          isOpen={isImportModalOpen}
+          onClose={() => setIsImportModalOpen(false)}
+        />
+      )}
     </div>
   )
 }

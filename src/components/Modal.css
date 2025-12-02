@@ -24,6 +24,10 @@
   flex-direction: column;
 }
 
+.modal-content--wide {
+  max-width: 960px;
+}
+
 .modal-header {
   display: flex;
   justify-content: space-between;

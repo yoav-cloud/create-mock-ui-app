@@ -32,6 +32,12 @@
   z-index: 2;
 }
 
+.playground-nav-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
 .playground-nav-actions {
   display: flex;
   align-items: center;
@@ -42,6 +48,23 @@
   margin: 0;
   font-size: 1.25rem;
   font-weight: 600;
+}
+
+.playground-new-btn {
+  border: 1px solid #2f80ed;
+  background: rgba(47, 128, 237, 0.15);
+  color: #d7e9ff;
+  font-weight: 600;
+  padding: 0.35rem 1rem;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.playground-new-btn:hover {
+  background: #2f80ed;
+  color: #fff;
+  border-color: #2f80ed;
 }
 
 .playground-nav-links {

@@ -79,28 +79,27 @@ export default function Controls({
 
   // Expand a specific layer when highlightedField changes (called from parent when layer indicator is clicked)
   useEffect(() => {
-    if (highlightedField) {
-      // Find the layer that corresponds to this field
-      const layer = allLayers.find(l => {
-        if (isTextLayer(l.layerData)) {
-          const fieldName = l.layerData.fieldName || l.layerKey
-          return fieldName === highlightedField
-        }
-        return false
-      })
-      
-      if (layer) {
-        setLocalExpandedLayers(prev => {
-          const newExpanded = new Set(prev)
-          newExpanded.add(layer.layerKey)
-          if (setExpandedLayers) {
-            setExpandedLayers(newExpanded)
-          }
-          return newExpanded
-        })
+    if (!highlightedField) return
+
+    // Find the layer that corresponds to this field
+    const layer = allLayers.find(l => {
+      if (isTextLayer(l.layerData)) {
+        const fieldName = l.layerData.fieldName || l.layerKey
+        return fieldName === highlightedField
       }
+      return false
+    })
+
+    if (!layer) return
+    if (localExpandedLayers.has(layer.layerKey)) return
+
+    const nextExpanded = new Set(localExpandedLayers)
+    nextExpanded.add(layer.layerKey)
+    setLocalExpandedLayers(nextExpanded)
+    if (setExpandedLayers) {
+      setExpandedLayers(nextExpanded)
     }
-  }, [highlightedField, allLayers, setExpandedLayers])
+  }, [highlightedField, allLayers, localExpandedLayers, setExpandedLayers])
 
   // Apply/remove highlighted class to control groups and accordions, and scroll to accordion
   useEffect(() => {
