@@ -22,6 +22,24 @@ import { GRAVITY_VALUES, CLOUDINARY_BASE_URL } from '../pages/playground/constan
  * @param {Function} params.buildFieldLogicLocal - Function to build field logic
  * @returns {string} Cloudinary transformation URL
  */
+const NON_GOOGLE_FONTS = new Set([
+  'arial',
+  'helvetica',
+  'times new roman',
+  'times',
+  'courier new',
+  'courier',
+  'verdana',
+  'georgia',
+  'palatino',
+  'garamond',
+  'bookman',
+  'comic sans ms',
+  'trebuchet ms',
+  'impact',
+  'tahoma'
+])
+
 export function buildCloudinaryTransform({
   rules,
   canvasDimensions,
@@ -139,7 +157,17 @@ export function buildCloudinaryTransform({
     }
   }
   
-  // Process each layer
+  const buildFontToken = (fontName = 'Arial', fontSize = 32, formatStr = '') => {
+    const trimmed = (fontName || 'Arial').trim() || 'Arial'
+    const normalized = trimmed.toLowerCase()
+    if (NON_GOOGLE_FONTS.has(normalized)) {
+      const fallback = fontToKebabCase(trimmed) || 'arial'
+      return `${fallback}_${fontSize}${formatStr}`
+    }
+    const encoded = trimmed.replace(/\s+/g, '%20')
+    return `${encoded}@google_${fontSize}${formatStr}`
+  }
+
   layerEntries.forEach(([layerKey, layerData]) => {
     if (isTextLayer(layerData)) {
       // Text layer
@@ -148,9 +176,6 @@ export function buildCloudinaryTransform({
       
       // Calculate font size
       const fontSize = calculateFontSize(layerData.fontSize, baseFontSize)
-      
-      // Get font
-      const font = fontToKebabCase(layerData.font || 'Arial')
       
       // Get color
       const color = hexToRgb(layerData.color || '#ffffff')
@@ -162,6 +187,9 @@ export function buildCloudinaryTransform({
       if (formatting.italic) formatParts.push('italic')
       if (formatting.strikethrough) formatParts.push('strikethrough')
       const formatStr = formatParts.length > 0 ? `_${formatParts.join('_')}` : ''
+      
+      // Get font token (after formatting is known)
+      const fontToken = buildFontToken(layerData.font || 'Arial', fontSize, formatStr)
       
       // Build text layer
       // For calculated layers (like origPrice), use the calculated variable
@@ -182,9 +210,9 @@ export function buildCloudinaryTransform({
       
       let textLayerPart
       if (textWrap && textWidth) {
-        textLayerPart = `c_fit,l_text:${font}_${fontSize}${formatStr}:${prefix}$(${varToUse})${suffix},co_rgb:${color},w_${textWidth}`
+        textLayerPart = `c_fit,l_text:${fontToken}:${prefix}$(${varToUse})${suffix},co_rgb:${color},w_${textWidth}`
       } else {
-        textLayerPart = `l_text:${font}_${fontSize}${formatStr}:${prefix}$(${varToUse})${suffix},co_rgb:${color}`
+        textLayerPart = `l_text:${fontToken}:${prefix}$(${varToUse})${suffix},co_rgb:${color}`
       }
       
       transformParts.push(textLayerPart)

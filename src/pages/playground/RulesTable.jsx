@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useMemo } from 'react'
 import './RulesTable.css'
-import { GRAVITY_VALUES, GOOGLE_FONTS } from './constants'
+import { GRAVITY_VALUES, GOOGLE_FONTS as DEFAULT_GOOGLE_FONTS } from './constants'
 import { extractLayersFromRules } from '../../utils/urlParser'
 
 // Configuration for General fields
@@ -77,7 +77,7 @@ export default function RulesTable({
 
   // Helper to get font options
   const getFontOptionsLocal = () => {
-    return GOOGLE_FONTS
+    return DEFAULT_GOOGLE_FONTS
   }
 
   // Use provided helpers or fallback to local ones

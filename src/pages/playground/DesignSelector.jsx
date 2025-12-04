@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { DESIGN_TYPES, DESIGN_RULES } from './constants'
+import { DESIGN_TYPES } from './constants'
 import './DesignSelector.css'
 
 export default function DesignSelector({ 
@@ -7,7 +7,8 @@ export default function DesignSelector({
   onDesignChange, 
   canvasDimensions,
   inheritanceToggles,
-  onInheritanceToggleChange
+  onInheritanceToggleChange,
+  getRulesForDesign
 }) {
   const [isParentHovered, setIsParentHovered] = useState(false)
 
@@ -17,10 +18,10 @@ export default function DesignSelector({
       <div className="design-tree">
         {/* Parent Design */}
         {DESIGN_TYPES.filter(d => d.id === 'parent').map(design => {
-          const rules = DESIGN_RULES[design.id] || DESIGN_RULES['parent']
+          const rules = getRulesForDesign ? getRulesForDesign(design.id) : {}
           const isSelected = selectedDesign.id === design.id
-          const displayWidth = isSelected ? canvasDimensions.width : rules.width
-          const displayHeight = isSelected ? canvasDimensions.height : rules.height
+          const displayWidth = isSelected ? canvasDimensions.width : (rules.width || design.width)
+          const displayHeight = isSelected ? canvasDimensions.height : (rules.height || design.height)
           return (
             <div key={design.id}>
               <div 
@@ -76,10 +77,10 @@ export default function DesignSelector({
         {/* Sub-designs */}
         <div className="sub-designs-container">
           {DESIGN_TYPES.filter(d => d.id !== 'parent').map((design) => {
-            const rules = DESIGN_RULES[design.id] || DESIGN_RULES['parent']
+            const rules = getRulesForDesign ? getRulesForDesign(design.id) : {}
             const isSelected = selectedDesign.id === design.id
-            const displayWidth = isSelected ? canvasDimensions.width : rules.width
-            const displayHeight = isSelected ? canvasDimensions.height : rules.height
+            const displayWidth = isSelected ? canvasDimensions.width : (rules.width || design.width)
+            const displayHeight = isSelected ? canvasDimensions.height : (rules.height || design.height)
             return (
               <div key={design.id} className="sub-design-wrapper">
                 <div 

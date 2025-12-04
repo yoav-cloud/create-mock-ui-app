@@ -26,8 +26,8 @@ export function hasMetadataSyntax(value) {
  * @returns {string|null} Metadata key or null if not found
  * @deprecated Use getFieldMetadataKey from fieldMetadataUtils.js instead
  */
-export function getMetadataKey(field) {
+export function getMetadataKey(field, rules = null) {
   // This function is kept for backward compatibility but should use fieldMetadataUtils
-  return getFieldMetadataKey(field)
+  return getFieldMetadataKey(field, rules)
 }
 

@@ -46,6 +46,7 @@ export default function PlaygroundDesignView() {
     getFieldType,
     getGravityOptions,
     getFontOptions,
+    getRulesForDesign,
     handleFontSizeValidation,
     hoveredLayerFromPanel,
     setHoveredLayerFromPanel,
@@ -69,6 +70,7 @@ export default function PlaygroundDesignView() {
         canvasDimensions={canvasDimensions}
         inheritanceToggles={inheritanceToggles}
         onInheritanceToggleChange={setInheritanceToggles}
+        getRulesForDesign={getRulesForDesign}
       />
 
       <Preview
@@ -129,6 +131,7 @@ export default function PlaygroundDesignView() {
         setExpandedLayers={setExpandedLayers}
         highlightedLayer={highlightedLayer}
         onLayerHover={setHoveredLayerFromPanel}
+        getFontOptions={getFontOptions}
       />
     </div>
   )

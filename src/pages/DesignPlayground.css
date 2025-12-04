@@ -50,6 +50,18 @@
   font-weight: 600;
 }
 
+.playground-nav-title h3 {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #bbb;
+  padding: 0.25rem 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  font-style: italic;
+}
+
 .playground-new-btn {
   border: 1px solid #2f80ed;
   background: rgba(47, 128, 237, 0.15);

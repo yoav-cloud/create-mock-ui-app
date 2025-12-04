@@ -8,7 +8,7 @@ import FigmaConverterPanel from './FigmaConverterPanel'
 import FigmaWizardSteps from './FigmaWizardSteps'
 import { fetchFigmaProfile, fetchTeamProjects, fetchProjectFiles, fetchFigmaFileDetails, fetchFigmaImagesForNodes } from './figmaApi'
 import { uploadImageFromUrl } from './cloudinaryUploads'
-import { collectFramesFromDocument, extractTemplatedNodes, findNodeById, buildTransformationForFrame, extractVariableFromName } from './figmaConversionUtils'
+import { collectFramesFromDocument, extractTemplatedNodes, findNodeById, buildTransformationForFrame, extractVariableFromName, buildDesignRulesFromNodes } from './figmaConversionUtils'
 
 const STEP = {
   CONNECT: 'connect',
@@ -69,9 +69,10 @@ const STORAGE_KEYS = {
 }
 const RECENT_TEAMS_KEY = 'figma_recent_team_ids'
 
-export default function FigmaImportModal({ isOpen, onClose }) {
+export default function FigmaImportModal({ isOpen, onClose, onTemplateImported = () => {} }) {
   const [step, setStep] = useState(STEP.CONNECT)
   const [isLoading, setIsLoading] = useState(false)
+  const [isStepTransitioning, setIsStepTransitioning] = useState(false)
   const [error, setError] = useState('')
   const [profile, setProfile] = useState(null)
   const [accessToken, setAccessToken] = useState(() => {
@@ -102,6 +103,7 @@ export default function FigmaImportModal({ isOpen, onClose }) {
   const [selectedFrameId, setSelectedFrameId] = useState('')
   const [frameFilter, setFrameFilter] = useState('')
   const [isConverting, setIsConverting] = useState(false)
+  const [isImporting, setIsImporting] = useState(false)
   const [isInspectingFile, setIsInspectingFile] = useState(false)
   const [conversionStatus, setConversionStatus] = useState('')
   const [conversionResult, setConversionResult] = useState(null)
@@ -111,6 +113,8 @@ export default function FigmaImportModal({ isOpen, onClose }) {
   const [templateName, setTemplateName] = useState('')
   const [templateTouched, setTemplateTouched] = useState(false)
   const [layerSelections, setLayerSelections] = useState({})
+  const [mainProductLayerId, setMainProductLayerId] = useState('')
+  const [transformationOverride, setTransformationOverride] = useState('')
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
   const [cloudinaryConfig, setCloudinaryConfig] = useState(() => {
     if (!isBrowser) {
@@ -224,10 +228,14 @@ useEffect(() => {
     setConversionStatus('')
     setCopySuccess('')
     setIsInspectingFile(false)
+    setIsStepTransitioning(false)
+    setIsImporting(false)
     setPreviewLayers(null)
     setTemplateName('')
     setTemplateTouched(false)
     setLayerSelections({})
+    setMainProductLayerId('')
+    setTransformationOverride('')
     setCloudinaryExpanded(!(cloudinaryConfig.cloudName && cloudinaryConfig.uploadPreset))
   }
 
@@ -436,6 +444,8 @@ useEffect(() => {
     setConversionStatus('')
     setPreviewLayers(null)
     setLayerSelections({})
+    setMainProductLayerId('')
+    setTransformationOverride('')
     if (projectFiles[normalizedId]) {
       return
     }
@@ -474,6 +484,8 @@ useEffect(() => {
     setConversionStatus('')
     setPreviewLayers(null)
     setLayerSelections({})
+    setMainProductLayerId('')
+    setTransformationOverride('')
   }, [activeTeamId])
 
   const handleBackToProjects = useCallback(() => {
@@ -482,6 +494,8 @@ useEffect(() => {
     setTemplateName('')
     setTemplateTouched(false)
     setLayerSelections({})
+    setMainProductLayerId('')
+    setTransformationOverride('')
   }, [])
 
   const handleInspectFile = useCallback(async (file) => {
@@ -498,7 +512,9 @@ useEffect(() => {
     setConversionStatus('Loading frames…')
     setPreviewLayers(null)
     setLayerSelections({})
+    setMainProductLayerId('')
     setTemplateTouched(false)
+    setTransformationOverride('')
     setSelectedFile({
       id: file.id,
       key: file.key || file.id,
@@ -546,6 +562,7 @@ useEffect(() => {
       setTemplateName('')
       setTemplateTouched(false)
       setLayerSelections({})
+      setMainProductLayerId('')
     } finally {
       setIsInspectingFile(false)
     }
@@ -595,13 +612,17 @@ useEffect(() => {
       })
     }
     setPreviewLayers(nextPreview)
-    setLayerSelections(prevSelections => {
-      const nextSelections = {}
-      templatedNodes.forEach(node => {
-        nextSelections[node.id] = prevSelections[node.id] === false ? false : true
-      })
-      return nextSelections
+    const selectionDefaults = {}
+    templatedNodes.forEach(node => {
+      selectionDefaults[node.id] = true
     })
+    setLayerSelections(selectionDefaults)
+    const defaultMain =
+      imageNodes.find(node => {
+        const normalizedName = node.name ? node.name.toLowerCase() : ''
+        return normalizedName.startsWith('#main') || normalizedName.startsWith('#product')
+      })?.id || imageNodes[0]?.id || ''
+    setMainProductLayerId(defaultMain)
     setConversionResult(null)
     setConversionUploads([])
     const totalLayers = imageNodes.length + textNodes.length
@@ -655,8 +676,14 @@ useEffect(() => {
       setError('Select at least one layer to import.')
       return
     }
+    const requiresMainProduct = selectedNodes.some(node => node.type !== 'TEXT')
+    if (requiresMainProduct && (!mainProductLayerId || layerSelections[mainProductLayerId] === false)) {
+      setError('Choose a main product image to continue.')
+      return
+    }
 
     setIsConverting(true)
+    setIsImporting(true)
     setConversionStatus('Fetching node previews…')
     setConversionResult(null)
     setConversionUploads([])
@@ -693,16 +720,16 @@ useEffect(() => {
         imageNodes,
         assetsMap
       })
-      const transformationWithDelimiter = conversion.transformation.endsWith('!!')
-        ? conversion.transformation
-        : `${conversion.transformation}/!!`
+      const userOverride = transformationOverride?.trim()
+      const finalTransformation = userOverride || conversion.transformation
       setConversionResult({
-        transformation: transformationWithDelimiter,
+        transformation: finalTransformation,
         frameName: frameNode.name,
         fileName: selectedFile.name,
         background: conversion.background,
         layers: conversion.layers
       })
+      setTransformationOverride(finalTransformation)
       setConversionStatus(`Converted ${conversion.layers.length} layer${conversion.layers.length === 1 ? '' : 's'}.`)
       if (import.meta.env.DEV) {
         // eslint-disable-next-line no-console
@@ -714,10 +741,28 @@ useEffect(() => {
           layers: conversion.layers
         })
       }
+      setConversionStatus('Importing to Playground…')
+      const designRulesResult = buildDesignRulesFromNodes({
+        frameNode,
+        nodes: selectedNodes,
+        assetsMap,
+        mainProductLayerId: requiresMainProduct ? mainProductLayerId : null
+      })
+      onTemplateImported({
+        templateName: templateName.trim() || selectedFile.name,
+        transformation: finalTransformation,
+        designRules: { parent: designRulesResult.rules },
+        fonts: designRulesResult.fonts
+      })
+      // Small delay to show the "Importing to Playground..." message
+      await new Promise(resolve => setTimeout(resolve, 500))
+      onClose()
+      resetState()
     } catch (err) {
       setError(err.message || 'Failed to convert the selected frame.')
     } finally {
       setIsConverting(false)
+      setIsImporting(false)
     }
   }, [
     accessToken,
@@ -725,11 +770,59 @@ useEffect(() => {
     fetchFigmaImagesForNodes,
     fileDocument,
     layerSelections,
+    mainProductLayerId,
     selectedFile,
     selectedFrameId,
     templateName,
-    uploadImageFromUrl
+    transformationOverride,
+    uploadImageFromUrl,
+    onTemplateImported,
+    onClose
   ])
+
+  const generatedPreviewTransformation = useMemo(() => {
+    if (step !== STEP.DETAILS || !fileDocument || !selectedFrameId) return ''
+    const documentRoot = fileDocument.document || fileDocument
+    const frameNode = findNodeById(documentRoot, selectedFrameId)
+    if (!frameNode) return ''
+
+    const templatedNodes = extractTemplatedNodes(frameNode)
+    const selectedNodes = templatedNodes.filter(node => layerSelections[node.id] !== false)
+
+    if (!selectedNodes.length) return ''
+
+    const textNodes = selectedNodes.filter(node => node.type === 'TEXT')
+    const imageNodes = selectedNodes.filter(node => node.type !== 'TEXT')
+
+    const templateSlug = sanitizeFolderSegment(templateName)
+    const baseFolder = cloudinaryConfig.folder || 'figma-exports'
+    const uploadFolder = buildFolderPath(baseFolder, templateSlug)
+
+    const mockAssetsMap = {}
+    imageNodes.forEach(node => {
+      const fallbackName = node.name || node.id
+      const cleanName = fallbackName.replace(/\//g, ':')
+      mockAssetsMap[node.id] = {
+        publicId: `${uploadFolder}/${cleanName}`
+      }
+    })
+
+    const conversion = buildTransformationForFrame({
+      frameNode,
+      textNodes,
+      imageNodes,
+      assetsMap: mockAssetsMap
+    })
+
+    return conversion.transformation
+  }, [step, fileDocument, selectedFrameId, layerSelections, templateName, cloudinaryConfig])
+
+  const transformationPreviewValue = useMemo(() => {
+    const overrideValue = transformationOverride.trim()
+    if (overrideValue) return overrideValue
+    if (conversionResult?.transformation) return conversionResult.transformation
+    return generatedPreviewTransformation
+  }, [transformationOverride, conversionResult, generatedPreviewTransformation])
 
   const handleInspectAnotherFrame = useCallback(() => {
     setConversionResult(null)
@@ -737,19 +830,22 @@ useEffect(() => {
     setCopySuccess('')
     setPreviewLayers(null)
     setLayerSelections({})
+    setMainProductLayerId('')
+    setTransformationOverride('')
     setStep(STEP.FRAMES)
   }, [])
 
   const handleCopyTransformation = useCallback(async () => {
-    if (!conversionResult?.transformation) return
+    const valueToCopy = transformationPreviewValue.trim()
+    if (!valueToCopy) return
     try {
-      await navigator.clipboard.writeText(conversionResult.transformation)
+      await navigator.clipboard.writeText(valueToCopy)
       setCopySuccess('Copied!')
       setTimeout(() => setCopySuccess(''), 2000)
     } catch {
       setCopySuccess('Copy failed')
     }
-  }, [conversionResult])
+  }, [transformationPreviewValue])
 
 
   const profileInitials = useMemo(() => {
@@ -795,50 +891,75 @@ useEffect(() => {
 
   const nextLabel = step === STEP.FRAMES ? 'Review import' : 'Next'
 
+  const selectedLayerCount = useMemo(() => {
+    if (!previewLayers) return 0
+    const allIds = [
+      ...(previewLayers.images || []).map(layer => layer.id),
+      ...(previewLayers.texts || []).map(layer => layer.id)
+    ]
+    if (!allIds.length) return 0
+    return allIds.filter(id => layerSelections[id] !== false).length
+  }, [layerSelections, previewLayers])
+
+  const requiresMainProductSelection = Boolean(previewLayers?.images?.length)
+  const hasMainProductSelection = !requiresMainProductSelection || (
+    mainProductLayerId && layerSelections[mainProductLayerId] !== false
+  )
+
   const handleBackStep = useCallback(() => {
-    switch (step) {
-      case STEP.TOKEN:
-        setStep(STEP.CONNECT)
-        break
-      case STEP.TEAM:
-        setStep(STEP.CONNECT)
-        break
-      case STEP.PROJECT:
-        setStep(STEP.TEAM)
-        break
-      case STEP.FILE:
-        setStep(STEP.PROJECT)
-        break
-      case STEP.FRAMES:
-        setStep(STEP.FILE)
-        break
-      case STEP.DETAILS:
-        setPreviewLayers(null)
-        setLayerSelections({})
-        setStep(STEP.FRAMES)
-        break
-      default:
-        break
-    }
+    setIsStepTransitioning(true)
+    setTimeout(() => {
+      switch (step) {
+        case STEP.TOKEN:
+          setStep(STEP.CONNECT)
+          break
+        case STEP.TEAM:
+          setStep(STEP.CONNECT)
+          break
+        case STEP.PROJECT:
+          setStep(STEP.TEAM)
+          break
+        case STEP.FILE:
+          setStep(STEP.PROJECT)
+          break
+        case STEP.FRAMES:
+          setStep(STEP.FILE)
+          break
+        case STEP.DETAILS:
+          setPreviewLayers(null)
+          setLayerSelections({})
+          setMainProductLayerId('')
+          setTransformationOverride('')
+          setStep(STEP.FRAMES)
+          break
+        default:
+          break
+      }
+      setIsStepTransitioning(false)
+    }, 150)
   }, [step])
 
   const handleNextStep = useCallback(() => {
-    switch (step) {
-      case STEP.TEAM:
-        if (teamProjects.length) setStep(STEP.PROJECT)
-        break
-      case STEP.PROJECT:
-        if (selectedProjectId && projectFiles[selectedProjectId]) setStep(STEP.FILE)
-        break
-      case STEP.FILE:
-        if (selectedFile) setStep(STEP.FRAMES)
-        break
-      case STEP.FRAMES:
-        handleProceedToDetails()
-        break
-      default:
-        break
-    }
+    setIsStepTransitioning(true)
+    setTimeout(() => {
+      switch (step) {
+        case STEP.TEAM:
+          if (teamProjects.length) setStep(STEP.PROJECT)
+          break
+        case STEP.PROJECT:
+          if (selectedProjectId && projectFiles[selectedProjectId]) setStep(STEP.FILE)
+          break
+        case STEP.FILE:
+          if (selectedFile) setStep(STEP.FRAMES)
+          break
+        case STEP.FRAMES:
+          handleProceedToDetails()
+          break
+        default:
+          break
+      }
+      setIsStepTransitioning(false)
+    }, 150)
   }, [step, teamProjects.length, selectedProjectId, projectFiles, selectedFile, handleProceedToDetails])
 
   const shouldUseWideModal = Boolean(profile)
@@ -852,11 +973,27 @@ useEffect(() => {
   }, [])
 
   const handleToggleLayerSelection = useCallback((nodeId) => {
+    setLayerSelections(prev => {
+      const nextValue = prev[nodeId] === false
+      const nextState = { ...prev, [nodeId]: nextValue }
+      if (!nextValue && nodeId === mainProductLayerId) {
+        const fallbackImage = previewLayers?.images?.find(
+          image => image.id !== nodeId && nextState[image.id] !== false
+        )
+        setMainProductLayerId(fallbackImage ? fallbackImage.id : '')
+      }
+      return nextState
+    })
+  }, [mainProductLayerId, previewLayers])
+
+  const handleMainProductChange = useCallback((nodeId) => {
+    if (!previewLayers?.images?.some(image => image.id === nodeId)) return
     setLayerSelections(prev => ({
       ...prev,
-      [nodeId]: prev[nodeId] === false
+      [nodeId]: true
     }))
-  }, [])
+    setMainProductLayerId(nodeId)
+  }, [previewLayers])
 
   const handleSignOut = useCallback(() => {
     if (isBrowser) {
@@ -902,7 +1039,9 @@ useEffect(() => {
   const isTemplateReady = Boolean(templateName.trim())
   const footerPrimaryLabel =
     step === STEP.DETAILS ? (isConverting ? 'Creating…' : 'Create Design') : nextLabel
-  const footerPrimaryDisabled = step === STEP.DETAILS ? (isConverting || !isTemplateReady) : !canGoNext
+  const footerPrimaryDisabled = step === STEP.DETAILS
+    ? (isConverting || !isTemplateReady || !selectedLayerCount || !hasMainProductSelection)
+    : !canGoNext
   const footerPrimaryAction = step === STEP.DETAILS ? handleRunConversion : handleNextStep
 
   const footerContent = (
@@ -933,12 +1072,22 @@ useEffect(() => {
       footerContent={footerContent}
     >
       <div className="figma-import-body">
-        <div className="modal-body-static">
+        {(isStepTransitioning || isImporting) && (
+          <div className="figma-loading-overlay">
+            <div className="figma-loading-content">
+              <div className="figma-inline-spinner" aria-hidden="true"></div>
+              <p className="figma-loading-text">
+                {isImporting ? conversionStatus || 'Importing…' : 'Loading…'}
+              </p>
+            </div>
+          </div>
+        )}
+        <div className={`modal-body-static ${isStepTransitioning || isImporting ? 'figma-content-blurred' : ''}`}>
           <FigmaWizardSteps steps={WIZARD_STEPS} currentStep={progressStep} />
           {error && <p className="figma-error">{error}</p>}
         </div>
 
-        <div className="modal-body-content figma-body-content">
+        <div className={`modal-body-content figma-body-content ${isStepTransitioning || isImporting ? 'figma-content-blurred' : ''}`}>
           {step === STEP.CONNECT && (
             <>
               <p className="figma-start-description">
@@ -990,6 +1139,7 @@ useEffect(() => {
             <FigmaProjectSelector
               projects={teamProjects}
               selectedProjectId={selectedProjectId}
+              loadingProjectId={projectLoadingId}
               onSelectProject={handleProjectSelect}
               onBack={handleChangeTeam}
             />
@@ -1022,6 +1172,7 @@ useEffect(() => {
                 setCopySuccess('')
                 setPreviewLayers(null)
                 setLayerSelections({})
+                setMainProductLayerId('')
                 if (!templateTouched) {
                   const nextFrame = frameOptions.find(frame => frame.id === frameId)
                   if (nextFrame) {
@@ -1064,10 +1215,14 @@ useEffect(() => {
               isInspectingFile={false}
               isConverting={isConverting}
               copySuccess={copySuccess}
+              transformationValue={transformationPreviewValue}
+              onTransformationChange={setTransformationOverride}
               templateName={templateName}
               onTemplateNameChange={handleTemplateNameChange}
               layerSelections={layerSelections}
               onToggleLayerSelection={handleToggleLayerSelection}
+              mainProductLayerId={mainProductLayerId}
+              onSelectMainProduct={handleMainProductChange}
               previewLayers={previewLayers}
               mode="details"
             />

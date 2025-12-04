@@ -1,5 +1,7 @@
 const TEMPLATE_MARKER = '#'
 
+import { GRAVITY_VALUES } from '../playground/constants'
+
 const sanitizeVariableName = (name = '') => {
   return name
     .toLowerCase()
@@ -59,7 +61,7 @@ const toHex = (value) => {
   return Math.max(0, Math.min(255, Math.round(value))).toString(16).padStart(2, '0')
 }
 
-const colorToHex = (color, opacity = 1) => {
+export const colorToHex = (color, opacity = 1) => {
   if (!color) return null
   const r = toHex((color.r ?? color.red ?? 0) * 255)
   const g = toHex((color.g ?? color.green ?? 0) * 255)
@@ -84,7 +86,7 @@ const cleanText = (value = '') => {
     .replace(/[\u200B-\u200D\uFEFF]/g, '')
 }
 
-const getRelativeBox = (node, frame) => {
+export const getRelativeBox = (node, frame) => {
   const source = node.absoluteRenderBounds || node.absoluteBoundingBox || { x: 0, y: 0, width: 0, height: 0 }
   const frameBox = frame.absoluteBoundingBox || { x: 0, y: 0 }
   return {
@@ -100,9 +102,22 @@ const buildTextLayer = (node, frame) => {
   const text = cleanText(node.characters || '')
   const fontSize = Math.round(node.style?.fontSize || node.fontSize || 32)
   const fontFamily = (node.style?.fontFamily || node.fontName?.family || 'Arial').replace(/\s+/g, '_')
-  const encodedText = encodeURIComponent(text || variable || node.name || 'Text')
   const colorHex = colorToHex(node.fills?.[0]?.color, (node.fills?.[0]?.opacity ?? 1) * (node.opacity ?? 1)) || '000000'
   const relative = getRelativeBox(node, frame)
+
+  let encodedText
+  let variableDefinition = null
+  
+  if (variable) {
+    // URL encode the text value for Cloudinary variable syntax
+    // The value between !...! delimiters should be URL encoded
+    const urlEncodedValue = encodeURIComponent(text)
+    variableDefinition = `$${variable}_!${urlEncodedValue}!`
+    encodedText = `$(${variable})`
+  } else {
+    encodedText = encodeURIComponent(text || node.name || 'Text')
+  }
+
   const overlay = [
     `l_text:${fontFamily}_${fontSize}:${encodedText}`,
     `co_rgb:${colorHex}`,
@@ -116,6 +131,7 @@ const buildTextLayer = (node, frame) => {
     name: node.name,
     type: 'text',
     variable,
+    variableDefinition,
     summary: `${variable ? `Variable $${variable}` : 'Static text'} @ (${relative.x}, ${relative.y})`,
     overlay: `${overlay}/fl_layer_apply`
   }
@@ -136,8 +152,19 @@ const buildImageLayer = (node, frame, assetsMap) => {
   }
   const rel = getRelativeBox(node, frame)
   const publicId = asset.publicId.replace(/\//g, ':')
+  
+  let variableDefinition = null
+  let layerPublicId = publicId
+
+  if (variable) {
+    // URL encode the publicId for Cloudinary variable syntax
+    const urlEncodedPublicId = encodeURIComponent(publicId)
+    variableDefinition = `$${variable}_!${urlEncodedPublicId}!`
+    layerPublicId = `$${variable}`
+  }
+
   const overlay = [
-    `l_${publicId}`,
+    `l_${layerPublicId}`,
     'g_north_west',
     `x_${rel.x}`,
     `y_${rel.y}`,
@@ -151,6 +178,7 @@ const buildImageLayer = (node, frame, assetsMap) => {
     name: node.name,
     type: 'image',
     variable,
+    variableDefinition,
     summary: `${variable ? `Variable $${variable}` : 'Layer'} @ (${rel.x}, ${rel.y})`,
     overlay: `${overlay}/fl_layer_apply`
   }
@@ -159,13 +187,17 @@ const buildImageLayer = (node, frame, assetsMap) => {
 export const buildTransformationForFrame = ({ frameNode, textNodes = [], imageNodes = [], assetsMap = {} }) => {
   const background = getBackgroundColor(frameNode)
   const baseSegments = []
-  if (background) {
-    baseSegments.push(`b_rgb:${background}`)
-  }
+  
+  // Collect variable definitions
+  const variableDefinitions = []
 
   const frameBox = frameNode.absoluteBoundingBox || { width: 0, height: 0 }
   if (frameBox.width && frameBox.height) {
     baseSegments.push(`c_pad,w_${Math.round(frameBox.width)},h_${Math.round(frameBox.height)}`)
+  }
+  
+  if (background) {
+    baseSegments.push(`b_rgb:${background}`)
   }
 
   const layers = []
@@ -174,23 +206,144 @@ export const buildTransformationForFrame = ({ frameNode, textNodes = [], imageNo
   textNodes.forEach(node => {
     const layer = buildTextLayer(node, frameNode)
     layers.push(layer)
+    if (layer.variableDefinition) {
+      variableDefinitions.push(layer.variableDefinition)
+    }
     overlays.push(layer.overlay)
   })
 
   imageNodes.forEach(node => {
     const layer = buildImageLayer(node, frameNode, assetsMap)
     layers.push(layer)
+    if (layer.variableDefinition) {
+      variableDefinitions.push(layer.variableDefinition)
+    }
     if (layer.overlay) {
       overlays.push(layer.overlay)
     }
   })
 
-  const transformation = [...baseSegments, ...overlays].filter(Boolean).join('/')
+  const transformation = [...variableDefinitions, ...baseSegments, ...overlays].filter(Boolean).join('/')
 
   return {
     transformation,
     background,
     layers
+  }
+}
+
+const cleanLayerName = (name = '') => {
+  return name.replace(/#[^#]+$/, '').trim() || 'Layer'
+}
+
+const toCamelCase = (value = '') => {
+  const cleaned = value
+    .replace(/#[^#]+$/, '')
+    .replace(/[^a-zA-Z0-9]+/g, ' ')
+    .trim()
+  if (!cleaned) return ''
+  return cleaned
+    .split(' ')
+    .map((word, index) => {
+      if (!word) return ''
+      if (index === 0) return word.toLowerCase()
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+    })
+    .join('')
+}
+
+const ensureUniqueKey = (base, usedKeys, fallback) => {
+  let key = base || fallback
+  let attempt = 1
+  while (usedKeys.has(key) || !key) {
+    key = `${base || fallback}${attempt}`
+    attempt += 1
+  }
+  usedKeys.add(key)
+  return key
+}
+
+const getFillColorHex = (node) => {
+  const fill = node?.fills?.find(f => f.type === 'SOLID' && f.visible !== false)
+  if (!fill) return '#ffffff'
+  return `#${colorToHex(fill.color, fill.opacity ?? 1)}`
+}
+
+export const buildDesignRulesFromNodes = ({
+  frameNode,
+  nodes,
+  assetsMap = {},
+  mainProductLayerId = null
+}) => {
+  if (!frameNode) return { rules: {}, fonts: [] }
+
+  const frameBox = frameNode.absoluteBoundingBox || { width: frameNode.width, height: frameNode.height }
+  const rules = {
+    width: Math.round(frameBox?.width || frameNode.width || 500),
+    height: Math.round(frameBox?.height || frameNode.height || 500),
+    backgroundColor: frameNode.backgroundColor
+      ? `#${colorToHex(frameNode.backgroundColor)}`
+      : '#000428'
+  }
+  const fonts = new Set()
+  const usedKeys = new Set(['width', 'height', 'backgroundColor'])
+
+  nodes.forEach((node, index) => {
+    const relative = getRelativeBox(node, frameNode)
+    const variableName = extractVariableFromName(node.name)
+    const baseKey = variableName || toCamelCase(node.name)
+    const fallbackKey = `layer${index + 1}`
+    const layerKey = ensureUniqueKey(baseKey, usedKeys, fallbackKey)
+    const displayName = cleanLayerName(node.name) || `Layer ${index + 1}`
+
+    if (node.type === 'TEXT') {
+      const fontFamily = (node.style?.fontFamily || node.fontName?.family || 'Arial').trim()
+      if (fontFamily) {
+        fonts.add(fontFamily)
+      }
+      const fontSize = Math.round(node.style?.fontSize || node.fontSize || 32)
+      const color = getFillColorHex(node)
+      const fieldName = variableName || layerKey
+
+      rules[layerKey] = {
+        x: Math.round(relative.x),
+        y: Math.round(relative.y),
+        gravity: GRAVITY_VALUES.northWest,
+        fontSize,
+        color,
+        font: fontFamily || 'Arial',
+        fieldName,
+        defaultValue: cleanText(node.characters || ''),
+        displayName,
+        textWrap: true,
+        textWidth: Math.round(relative.width || rules.width * 0.8)
+      }
+    } else {
+      const layerData = {
+        width: Math.round(relative.width),
+        height: Math.round(relative.height),
+        x: Math.round(relative.x),
+        y: Math.round(relative.y),
+        gravity: GRAVITY_VALUES.northWest,
+        displayName
+      }
+
+      if (node.id === mainProductLayerId) {
+        layerData.isMainProduct = true
+      } else {
+        const upload = assetsMap[node.id]
+        if (upload?.publicId) {
+          layerData.publicId = upload.publicId
+        }
+      }
+
+      rules[layerKey] = layerData
+    }
+  })
+
+  return {
+    rules,
+    fonts: Array.from(fonts)
   }
 }
 

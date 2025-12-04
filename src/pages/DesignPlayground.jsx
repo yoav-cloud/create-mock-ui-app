@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import './DesignPlayground.css'
-import { ASSETS, DESIGN_TYPES, DESIGN_RULES, GRAVITY_VALUES, GOOGLE_FONTS, LIGHT_BLUE, BASE_WIDTH, CLOUDINARY_BASE_URL } from './playground/constants'
+import { ASSETS, DESIGN_TYPES, DESIGN_RULES as DEFAULT_DESIGN_RULES, GRAVITY_VALUES, GOOGLE_FONTS as DEFAULT_GOOGLE_FONTS, LIGHT_BLUE, BASE_WIDTH, CLOUDINARY_BASE_URL } from './playground/constants'
 import AssetSwitcher from './playground/AssetSwitcher'
 import { parseUrlSegments as parseUrlSegmentsUtil, generateLayerConfig, extractLayersFromRules } from '../utils/urlParser'
 import { extractMetadataId, hasMetadataSyntax, getMetadataKey } from '../utils/metadataUtils'
@@ -13,8 +13,20 @@ import { extractLayers, isTextLayer, isImageLayer } from '../utils/layerUtils'
 import { shouldInheritProperty } from '../utils/inheritanceUtils'
 import { createRuleUpdateHandler } from '../utils/ruleUpdateUtils'
 import FigmaImportModal from './figma/FigmaImportModal'
+import NewDesignModal from './playground/NewDesignModal'
+
+const cloneDesignRules = () => JSON.parse(JSON.stringify(DEFAULT_DESIGN_RULES))
+
+const mergeFontOptions = (current = [], incoming = []) => {
+  const existing = new Set(current.map(font => font.value.toLowerCase()))
+  const additions = incoming
+    .map(font => (typeof font === 'string' ? { name: font, value: font } : font))
+    .filter(font => font && !existing.has(font.value.toLowerCase()))
+  return [...current, ...additions]
+}
 
 function DesignPlayground() {
+  const defaultRulesRef = useRef(cloneDesignRules())
   const [selectedAsset, setSelectedAsset] = useState(() => {
     const saved = localStorage.getItem('playground_asset')
     return saved ? ASSETS.find(a => a.id === saved) || ASSETS[2] : ASSETS[2]
@@ -25,6 +37,9 @@ function DesignPlayground() {
     return saved ? DESIGN_TYPES.find(d => d.id === saved) || DESIGN_TYPES[0] : DESIGN_TYPES[0]
   })
 
+  const [designName, setDesignName] = useState('Shoes Ad Example')
+
+  const [isNewDesignModalOpen, setIsNewDesignModalOpen] = useState(false)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
 
   const [formValues, setFormValues] = useState(() => {
@@ -33,10 +48,10 @@ function DesignPlayground() {
       return JSON.parse(saved)
     }
     // Initialize dynamically from field definitions
-    const fieldNames = getAllFieldNames()
+    const fieldNames = getAllFieldNames(defaultRulesRef.current['parent'])
     const initialValues = {}
     fieldNames.forEach(fieldName => {
-      initialValues[fieldName] = getFieldDefaultValue(fieldName)
+      initialValues[fieldName] = getFieldDefaultValue(fieldName, defaultRulesRef.current['parent'])
     })
     return initialValues
   })
@@ -48,7 +63,7 @@ function DesignPlayground() {
       return JSON.parse(saved)
     }
     // Initialize from current design rules
-    const currentRules = DESIGN_RULES[selectedDesign.id] || DESIGN_RULES['parent']
+    const currentRules = defaultRulesRef.current[selectedDesign.id] || defaultRulesRef.current['parent']
     return {
       width: currentRules.width,
       height: currentRules.height
@@ -81,8 +96,8 @@ function DesignPlayground() {
         const parsed = JSON.parse(saved)
         // Merge with DESIGN_RULES to ensure all properties exist
         const merged = {}
-        Object.keys(DESIGN_RULES).forEach(designId => {
-          const designRule = DESIGN_RULES[designId]
+        Object.keys(defaultRulesRef.current).forEach(designId => {
+          const designRule = defaultRulesRef.current[designId]
           const savedRule = parsed[designId] || {}
 
           // Deep merge layer properties dynamically
@@ -131,7 +146,7 @@ function DesignPlayground() {
         return merged
       } catch (e) {
         // If parsing fails, use DESIGN_RULES
-        const defaultRules = JSON.parse(JSON.stringify(DESIGN_RULES))
+        const defaultRules = JSON.parse(JSON.stringify(defaultRulesRef.current))
         // Ensure textWidth defaults for text layers with textWrap
         Object.keys(defaultRules).forEach(designId => {
           const designRule = defaultRules[designId]
@@ -148,7 +163,7 @@ function DesignPlayground() {
         return defaultRules
       }
     }
-    const defaultRules = JSON.parse(JSON.stringify(DESIGN_RULES))
+    const defaultRules = JSON.parse(JSON.stringify(defaultRulesRef.current))
     // Ensure textWidth defaults for text layers with textWrap
     Object.keys(defaultRules).forEach(designId => {
       const designRule = defaultRules[designId]
@@ -165,13 +180,28 @@ function DesignPlayground() {
     return defaultRules
   })
 
+  const [availableFonts, setAvailableFonts] = useState(() => {
+    const saved = localStorage.getItem('playground_fonts')
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved)
+        if (Array.isArray(parsed)) {
+          return parsed
+        }
+      } catch {
+        // ignore parse errors
+      }
+    }
+    return [...DEFAULT_GOOGLE_FONTS]
+  })
+
   const [useMetadata, setUseMetadata] = useState(() => {
     const saved = localStorage.getItem('playground_metadata_toggles')
     if (saved) {
       return JSON.parse(saved)
     }
     // Initialize dynamically from field definitions
-    const fieldNames = getAllFieldNames()
+    const fieldNames = getAllFieldNames(defaultRulesRef.current['parent'])
     const initialToggles = {}
     fieldNames.forEach(fieldName => {
       initialToggles[fieldName] = false
@@ -186,7 +216,7 @@ function DesignPlayground() {
       return JSON.parse(saved)
     }
     // Initialize dynamically from field definitions
-    const fieldNames = getAllFieldNames()
+    const fieldNames = getAllFieldNames(defaultRulesRef.current['parent'])
     const initialSaved = {}
     fieldNames.forEach(fieldName => {
       initialSaved[fieldName] = null
@@ -209,6 +239,18 @@ function DesignPlayground() {
     const saved = localStorage.getItem('playground_property_overrides')
     return saved ? JSON.parse(saved) : {}
   })
+
+  const parentRules = useMemo(() => {
+    return editableRules['parent'] || defaultRulesRef.current['parent']
+  }, [editableRules])
+
+  const getRulesForDesign = useCallback((designId) => {
+    return editableRules[designId]
+      || defaultRulesRef.current[designId]
+      || editableRules['parent']
+      || defaultRulesRef.current['parent']
+      || {}
+  }, [editableRules])
 
   // Parent card hover state
   const [isParentHovered, setIsParentHovered] = useState(false)
@@ -250,9 +292,13 @@ function DesignPlayground() {
     localStorage.setItem('playground_property_overrides', JSON.stringify(propertyOverrides))
   }, [propertyOverrides])
 
+  useEffect(() => {
+    localStorage.setItem('playground_fonts', JSON.stringify(availableFonts))
+  }, [availableFonts])
+
   // Update canvas dimensions when design changes
   useEffect(() => {
-    const rules = editableRules[selectedDesign.id] || editableRules['parent'] || DESIGN_RULES[selectedDesign.id] || DESIGN_RULES['parent']
+    const rules = getRulesForDesign(selectedDesign.id)
     // Update to match the new design's dimensions
     setCanvasDimensions({
       width: rules.width,
@@ -265,14 +311,14 @@ function DesignPlayground() {
 
   // Initialize formValues to show metadata syntax if toggle is on but formValues doesn't have it
   useEffect(() => {
-    const fieldNames = getAllFieldNames()
+    const fieldNames = getAllFieldNames(parentRules)
     const updates = {}
     let needsUpdate = false
 
     fieldNames.forEach(fieldName => {
       if (useMetadata[fieldName]) {
         const currentValue = formValues[fieldName]
-        const expectedSyntax = getFieldMetadataSyntax(fieldName)
+        const expectedSyntax = getFieldMetadataSyntax(fieldName, parentRules)
         // If toggle is on but value doesn't match metadata syntax, update it
         if (currentValue !== expectedSyntax && !hasMetadataSyntax(currentValue)) {
           updates[fieldName] = expectedSyntax
@@ -284,7 +330,7 @@ function DesignPlayground() {
     if (needsUpdate) {
       setFormValues(prev => ({ ...prev, ...updates }))
     }
-  }, []) // Only run on mount
+  }, [])
 
   // Sync toggle state with formValues on mount (in case formValues already contain {metadata})
   useEffect(() => {
@@ -304,7 +350,7 @@ function DesignPlayground() {
           const cleaned = formValues[field].replace(/\{[^}]+\}/g, '').trim()
           setSavedValues(prev => ({
             ...prev,
-            [field]: cleaned || getFieldDefaultValue(field)
+            [field]: cleaned || getFieldDefaultValue(field, parentRules)
           }))
         }
       }
@@ -316,7 +362,7 @@ function DesignPlayground() {
         ...syncUpdates
       }))
     }
-  }, []) // Only run on mount
+  }, [])
 
   // Debounced values for the URL generation
   const [debouncedValues, setDebouncedValues] = useState(formValues)
@@ -384,15 +430,16 @@ function DesignPlayground() {
   const buildDesignPreviewUrl = useCallback((designObj, dimensionsOverride = null) => {
     if (!designObj) return ''
 
-    const rules = editableRules[designObj.id]
-      || DESIGN_RULES[designObj.id]
-      || editableRules['parent']
-      || DESIGN_RULES['parent']
+    const rules = getRulesForDesign(designObj.id)
 
     const resolvedDimensions = dimensionsOverride || {
       width: rules?.width || designObj.width || BASE_WIDTH,
       height: rules?.height || designObj.height || BASE_WIDTH
     }
+
+    const resolveDefaultValue = (fieldName, formVals, metadataToggles, saved) =>
+      getDefaultValue(fieldName, formVals, metadataToggles, saved, rules)
+    const resolveMetaKey = (fieldName, formVals) => getMetaKeyForField(fieldName, formVals, rules)
 
     return buildCloudinaryTransform({
       rules,
@@ -403,14 +450,14 @@ function DesignPlayground() {
       selectedAsset,
       selectedDesign: designObj,
       baseWidth: BASE_WIDTH,
-      getDefaultValue: (fieldName) => getDefaultValue(fieldName, debouncedValues, debouncedUseMetadata, savedValues),
+      getDefaultValue: resolveDefaultValue,
       shouldUseMetadata,
-      getMetaKeyForField,
+      getMetaKeyForField: resolveMetaKey,
       getBackgroundColorValue: () => getBackgroundColorValue(debouncedValues, debouncedUseMetadata, savedValues),
       buildFieldLogicLocal
     })
   }, [
-    editableRules,
+    getRulesForDesign,
     debouncedValues,
     debouncedUseMetadata,
     savedValues,
@@ -426,7 +473,7 @@ function DesignPlayground() {
 
   const reviewPreviews = useMemo(() => {
     return DESIGN_TYPES.map(design => {
-      const rules = editableRules[design.id] || DESIGN_RULES[design.id] || {}
+      const rules = getRulesForDesign(design.id)
       const width = rules.width || design.width || BASE_WIDTH
       const height = rules.height || design.height || BASE_WIDTH
 
@@ -437,7 +484,7 @@ function DesignPlayground() {
         height
       }
     })
-  }, [buildDesignPreviewUrl, editableRules])
+  }, [buildDesignPreviewUrl, getRulesForDesign])
 
   useEffect(() => {
     if (!reviewPreviews.length) return
@@ -461,9 +508,8 @@ function DesignPlayground() {
 
   // Extract layers from rules dynamically
   const layerMap = useMemo(() => {
-    const rules = editableRules['parent'] || DESIGN_RULES['parent'] || {}
-    return extractLayersFromRules(rules)
-  }, [editableRules])
+    return extractLayersFromRules(parentRules)
+  }, [parentRules])
 
   // Generate layer configuration from layer map
   const layerConfig = useMemo(() => {
@@ -572,7 +618,7 @@ function DesignPlayground() {
 
   // Helper to get font options
   const getFontOptions = () => {
-    return GOOGLE_FONTS
+    return availableFonts
   }
 
   // Helper to check if a property is overridden (not inherited) for a child design
@@ -881,7 +927,7 @@ function DesignPlayground() {
       // If current value contains {metadata}, try to extract the non-metadata part
       if (hasMetadataSyntax(currentValue)) {
         const cleaned = currentValue.replace(/\{[^}]+\}/g, '').trim()
-        valueToSave = cleaned || getFieldDefaultValue(field)
+        valueToSave = cleaned || getFieldDefaultValue(field, parentRules)
       }
 
       setSavedValues(prev => ({
@@ -890,7 +936,7 @@ function DesignPlayground() {
       }))
 
       // Set to metadata syntax using {id} format
-      const metaSyntax = getFieldMetadataSyntax(field)
+      const metaSyntax = getFieldMetadataSyntax(field, parentRules)
       setFormValues(prev => ({
         ...prev,
         [field]: metaSyntax
@@ -899,7 +945,7 @@ function DesignPlayground() {
       // Restore saved value when turning off, or fallback to default
       const valueToRestore = savedValues[field] !== null
         ? savedValues[field]
-        : getFieldDefaultValue(field)
+        : getFieldDefaultValue(field, parentRules)
 
       setFormValues(prev => ({
         ...prev,
@@ -940,6 +986,133 @@ function DesignPlayground() {
     }
   }, [getLayerKeyByFieldName])
 
+  const handleTemplateImported = useCallback((payload) => {
+    if (!payload?.designRules?.parent) return
+    const parentRule = payload.designRules.parent
+    setEditableRules(prev => ({
+      ...prev,
+      ...payload.designRules
+    }))
+    defaultRulesRef.current = {
+      ...defaultRulesRef.current,
+      ...payload.designRules
+    }
+    const fieldNames = getAllFieldNames(parentRule)
+    const nextFormValues = {}
+    fieldNames.forEach(fieldName => {
+      if (fieldName === 'backgroundColor' && parentRule.backgroundColor) {
+        nextFormValues[fieldName] = parentRule.backgroundColor
+      } else {
+        nextFormValues[fieldName] = getFieldDefaultValue(fieldName, parentRule)
+      }
+    })
+    setFormValues(nextFormValues)
+    const metadataToggles = {}
+    fieldNames.forEach(fieldName => {
+      metadataToggles[fieldName] = false
+    })
+    setUseMetadata(metadataToggles)
+    const nextSavedValues = {}
+    fieldNames.forEach(fieldName => {
+      nextSavedValues[fieldName] = null
+    })
+    setSavedValues(nextSavedValues)
+    setCanvasDimensions({
+      width: parentRule.width || BASE_WIDTH,
+      height: parentRule.height || BASE_WIDTH
+    })
+    setSelectedDesign(DESIGN_TYPES[0])
+    setInheritanceToggles({
+      inheritStyles: true,
+      inheritAll: false
+    })
+    setPropertyOverrides({})
+    setPreviewTab('visual')
+    setReviewMode('grid')
+    setActiveReviewDesignId('parent')
+    setHighlightedRow(null)
+    setHighlightedField(null)
+    setHighlightedLayer(null)
+    setExpandedLayers(new Set())
+    setShowLayerOverlays(false)
+    if (payload.fonts?.length) {
+      setAvailableFonts(prev => mergeFontOptions(prev, payload.fonts))
+    }
+    if (payload.templateName) {
+      // Just use the template name directly as provided (it should already be formatted/cleaned if needed)
+      setDesignName(payload.templateName)
+    }
+    toast.success(`Created design from ${payload.templateName || 'imported template'}`)
+  }, [])
+
+  const handleSelectExample = useCallback(() => {
+    // Reset to default design rules
+    const defaultRules = cloneDesignRules()
+    defaultRulesRef.current = defaultRules
+    setEditableRules(defaultRules)
+    
+    // Reset form values to defaults
+    const fieldNames = getAllFieldNames(defaultRules['parent'])
+    const initialValues = {}
+    fieldNames.forEach(fieldName => {
+      initialValues[fieldName] = getFieldDefaultValue(fieldName, defaultRules['parent'])
+    })
+    setFormValues(initialValues)
+    
+    // Reset metadata toggles
+    const metadataToggles = {}
+    fieldNames.forEach(fieldName => {
+      metadataToggles[fieldName] = false
+    })
+    setUseMetadata(metadataToggles)
+    
+    // Reset saved values
+    const savedVals = {}
+    fieldNames.forEach(fieldName => {
+      savedVals[fieldName] = null
+    })
+    setSavedValues(savedVals)
+    
+    // Reset canvas dimensions
+    const parentRule = defaultRules['parent']
+    setCanvasDimensions({
+      width: parentRule.width || BASE_WIDTH,
+      height: parentRule.height || BASE_WIDTH
+    })
+    
+    // Reset design name
+    setDesignName('Shoes Ad Example')
+    
+    // Reset other states
+    setSelectedDesign(DESIGN_TYPES[0])
+    setInheritanceToggles({
+      inheritStyles: true,
+      inheritAll: false
+    })
+    setPropertyOverrides({})
+    setPreviewTab('visual')
+    setReviewMode('grid')
+    setActiveReviewDesignId('parent')
+    setHighlightedRow(null)
+    setHighlightedField(null)
+    setHighlightedLayer(null)
+    setExpandedLayers(new Set())
+    setShowLayerOverlays(false)
+    
+    toast.success('Reset to default example')
+  }, [])
+
+  const handleSelectFigma = useCallback(() => {
+    setIsImportModalOpen(true)
+  }, [])
+
+  const handleSelectCloudinary = useCallback(() => {
+    toast('Coming soon', {
+      icon: 'ℹ️',
+      duration: 2000
+    })
+  }, [])
+
   const isLocalEnvironment = useMemo(() => {
     if (typeof window === 'undefined') {
       return import.meta.env.DEV
@@ -950,6 +1123,7 @@ function DesignPlayground() {
 
   useEffect(() => {
     if (!isLocalEnvironment) {
+      setIsNewDesignModalOpen(false)
       setIsImportModalOpen(false)
     }
   }, [isLocalEnvironment])
@@ -990,6 +1164,7 @@ function DesignPlayground() {
     getFieldType,
     getGravityOptions,
     getFontOptions,
+    getRulesForDesign,
     handleFontSizeValidation,
     hoveredLayerFromPanel,
     setHoveredLayerFromPanel,
@@ -1023,15 +1198,7 @@ function DesignPlayground() {
       <div className="playground-top-nav">
         <div className="playground-nav-title">
           <h2>Design Playground</h2>
-          {isLocalEnvironment && (
-            <button
-              type="button"
-              className="playground-new-btn"
-              onClick={() => setIsImportModalOpen(true)}
-            >
-              New
-            </button>
-          )}
+          {designName && <h3>{designName}</h3>}
         </div>
         <div className="playground-nav-actions">
           <div className="playground-nav-links">
@@ -1048,11 +1215,20 @@ function DesignPlayground() {
             >
               Review
             </NavLink>
-          </div>
+          </div>          
           <AssetSwitcher
             selectedAsset={selectedAsset}
             onAssetChange={setSelectedAsset}
           />
+          {isLocalEnvironment && (
+            <button
+              type="button"
+              className="playground-new-btn"
+              onClick={() => setIsNewDesignModalOpen(true)}
+            >
+              New
+            </button>
+          )}
         </div>
       </div>
 
@@ -1060,10 +1236,20 @@ function DesignPlayground() {
         <Outlet context={{ design: designContext, review: reviewContext }} />
       </div>
       {isLocalEnvironment && (
-        <FigmaImportModal
-          isOpen={isImportModalOpen}
-          onClose={() => setIsImportModalOpen(false)}
-        />
+        <>
+          <NewDesignModal
+            isOpen={isNewDesignModalOpen}
+            onClose={() => setIsNewDesignModalOpen(false)}
+            onSelectExample={handleSelectExample}
+            onSelectFigma={handleSelectFigma}
+            onSelectCloudinary={handleSelectCloudinary}
+          />
+          <FigmaImportModal
+            isOpen={isImportModalOpen}
+            onClose={() => setIsImportModalOpen(false)}
+            onTemplateImported={handleTemplateImported}
+          />
+        </>
       )}
     </div>
   )

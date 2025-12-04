@@ -1,5 +1,5 @@
 import { extractLayers, isTextLayer } from './layerUtils'
-import { DESIGN_RULES } from '../pages/playground/constants'
+import { DESIGN_RULES as DEFAULT_DESIGN_RULES } from '../pages/playground/constants'
 
 /**
  * Gets field metadata (defaultValue, metadataKey) from layer definitions
@@ -7,7 +7,7 @@ import { DESIGN_RULES } from '../pages/playground/constants'
  * @returns {Object} Map of fieldName -> { defaultValue, metadataKey }
  */
 export function getFieldMetadata(rules = null) {
-  const rulesToUse = rules || DESIGN_RULES['parent']
+  const rulesToUse = rules || DEFAULT_DESIGN_RULES['parent']
   const layers = extractLayers(rulesToUse)
   const metadata = {}
   

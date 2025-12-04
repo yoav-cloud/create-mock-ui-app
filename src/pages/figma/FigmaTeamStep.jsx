@@ -28,7 +28,8 @@ export default function FigmaTeamStep({
       </p>
       <div className="figma-actions">
         <button type="submit" className="figma-primary-btn" disabled={isLoading}>
-          {isLoading ? 'Loading…' : 'Load projects'}
+          {isLoading && <div className="figma-inline-spinner on-dark" aria-hidden="true" />}
+          {isLoading ? 'Loading projects…' : 'Load projects'}
         </button>
       </div>
       <FigmaRecentTeams teams={recentTeams} onSelect={onSelectRecent} />

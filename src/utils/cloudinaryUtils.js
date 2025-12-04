@@ -19,7 +19,7 @@ export function escapeCloudinaryString(str) {
  * @param {Object} savedValues - Saved values when metadata is used
  * @returns {string|number} Default value
  */
-export function getDefaultValue(field, formValues, useMetadata, savedValues) {
+export function getDefaultValue(field, formValues, useMetadata, savedValues, rules = null) {
   const formVal = formValues[field]
   const hasMetadata = hasMetadataSyntax(formVal)
   
@@ -30,7 +30,7 @@ export function getDefaultValue(field, formValues, useMetadata, savedValues) {
       return savedValues[field]
     }
     // If no saved value, use default from field definitions
-    return getFieldDefaultValue(field)
+    return getFieldDefaultValue(field, rules)
   }
   // Toggle is off and no metadata syntax - use formValues directly
   return formVal
@@ -54,14 +54,14 @@ export function shouldUseMetadata(field, formValues, useMetadata) {
  * @param {Object} formValues - Current form values
  * @returns {string|null} Metadata key or null
  */
-export function getMetaKeyForField(field, formValues) {
+export function getMetaKeyForField(field, formValues, rules = null) {
   const formVal = formValues[field]
   const extractedId = extractMetadataId(formVal)
   if (extractedId) {
     return extractedId
   }
   // Fallback to default mapping
-  return getMetadataKey(field)
+  return getMetadataKey(field, rules)
 }
 
 /**

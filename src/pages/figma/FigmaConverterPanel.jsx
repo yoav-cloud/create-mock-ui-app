@@ -26,6 +26,10 @@ export default function FigmaConverterPanel({
   onTemplateNameChange = () => {},
   layerSelections = {},
   onToggleLayerSelection = () => {},
+  mainProductLayerId = '',
+  onSelectMainProduct = () => {},
+  transformationValue = '',
+  onTransformationChange = () => {},
   mode = 'picker'
 }) {
   if (!selectedFile) return null
@@ -53,6 +57,7 @@ export default function FigmaConverterPanel({
     }, {})
   }, [conversionUploads])
   const isLayerChecked = (nodeId) => layerSelections[nodeId] !== false
+  const requiresMainProduct = Boolean(previewLayers?.images?.length)
 
   return (
     <div className="figma-converter-panel">
@@ -219,6 +224,7 @@ export default function FigmaConverterPanel({
                 <thead>
                   <tr>
                     <th className="figma-preview-check-col">Import</th>
+                    <th className="figma-preview-main-col">Main product</th>
                     <th>Layer</th>
                     <th>Variable</th>
                     <th>Dimensions</th>
@@ -236,7 +242,19 @@ export default function FigmaConverterPanel({
                             type="checkbox"
                             checked={isLayerChecked(layer.id)}
                             onChange={() => onToggleLayerSelection(layer.id)}
-                            disabled={isConverting}
+                            disabled={isConverting || mainProductLayerId === layer.id}
+                          />
+                        </label>
+                      </td>
+                      <td className="figma-preview-main-col">
+                        <label className={`figma-layer-radio ${!isLayerChecked(layer.id) ? 'disabled' : ''}`}>
+                          <input
+                            type="radio"
+                            name="figma-main-product"
+                            value={layer.id}
+                            checked={mainProductLayerId === layer.id}
+                            onChange={() => onSelectMainProduct(layer.id)}
+                            disabled={!isLayerChecked(layer.id) || isConverting}
                           />
                         </label>
                       </td>
@@ -250,6 +268,11 @@ export default function FigmaConverterPanel({
             ) : (
               <p className="figma-empty-state figma-empty-state--muted">
                 No image layers were flagged with the # marker.
+              </p>
+            )}
+            {requiresMainProduct && (
+              <p className="figma-main-product-hint">
+                Select the image that should respond to the asset switcher. The others will always use their uploaded assets.
               </p>
             )}
           </div>
@@ -301,17 +324,26 @@ export default function FigmaConverterPanel({
         </div>
       )}
 
-      {mode === 'details' && conversionResult && (
+      {mode === 'details' && (
         <div className="figma-converter-output">
-          <label className="figma-team-label" htmlFor="figma-transformation-output">Transformation string</label>
+          <label className="figma-team-label" htmlFor="figma-transformation-output">Transformation preview</label>
           <textarea
             id="figma-transformation-output"
             className="figma-transformation-textarea"
-            readOnly
-            value={conversionResult.transformation}
+            value={transformationValue}
+            onChange={(event) => onTransformationChange(event.target.value)}
+            placeholder="Generate or paste the Cloudinary transformation you plan to use."
           />
+          <p className="figma-template-hint">
+            This string is what the Playground will receive when you create the design. Adjust it if you need to tweak the resulting asset.
+          </p>
+          {conversionResult && (
+            <p className="figma-team-help">
+              Frame: {conversionResult.frameName} • File: {conversionResult.fileName}
+            </p>
+          )}
           <div className="figma-converter-output-actions">
-            <button type="button" className="figma-secondary-btn" onClick={onCopyTransformation}>
+            <button type="button" className="figma-secondary-btn" onClick={onCopyTransformation} disabled={!transformationValue.trim()}>
               Copy transformation
             </button>
             {onInspectAnotherFrame && (
@@ -319,12 +351,13 @@ export default function FigmaConverterPanel({
                 Inspect another frame
               </button>
             )}
-            <p className="figma-team-help">
-              Frame: {conversionResult.frameName} • File: {conversionResult.fileName}
-            </p>
             {copySuccess && <span className="figma-copy-hint">{copySuccess}</span>}
           </div>
+        </div>
+      )}
 
+      {mode === 'details' && conversionResult && (
+        <div className="figma-converter-output">
           {!!conversionResult.layers?.length && (
             <div className="figma-layers-table">
               <p className="figma-files-eyebrow">Layers</p>

@@ -5,6 +5,7 @@ import './FigmaImportModal.css'
 export default function FigmaProjectSelector({
   projects = [],
   selectedProjectId,
+  loadingProjectId,
   onSelectProject,
   onBack
 }) {
@@ -27,6 +28,7 @@ export default function FigmaProjectSelector({
       <FigmaProjectsList
         projects={projects}
         selectedProjectId={selectedProjectId}
+        loadingProjectId={loadingProjectId}
         onSelect={onSelectProject}
       />
     </div>

@@ -1,8 +1,7 @@
 import React, { useMemo, useEffect, useState } from 'react'
 import './Controls.css'
-import { GOOGLE_FONTS, GRAVITY_VALUES } from './constants'
+import { GOOGLE_FONTS as DEFAULT_GOOGLE_FONTS, GRAVITY_VALUES } from './constants'
 import { extractLayers, isTextLayer, isImageLayer } from '../../utils/layerUtils'
-import { getAllFieldNames } from '../../utils/fieldMetadataUtils'
 
 export default function Controls({
   canvasDimensions,
@@ -26,8 +25,11 @@ export default function Controls({
   expandedLayers,
   setExpandedLayers,
   highlightedLayer,
-  onLayerHover
+  onLayerHover,
+  getFontOptions
 }) {
+  const fontOptions = (typeof getFontOptions === 'function' ? getFontOptions() : DEFAULT_GOOGLE_FONTS)
+
   // Get all layers in order from design_rules
   const allLayers = useMemo(() => {
     if (!layerMap) return []
@@ -609,7 +611,7 @@ export default function Controls({
                             onChange={(e) => handleRuleUpdate('Layers', displayName, 'font', e.target.value)}
                             style={{ flex: 1 }}
                           >
-                            {GOOGLE_FONTS.map(font => (
+                            {fontOptions.map(font => (
                               <option key={font.value} value={font.value}>
                                 {font.name}
                               </option>
