@@ -22,6 +22,10 @@ export default function FigmaConverterPanel({
   isConverting,
   copySuccess,
   previewLayers = null,
+  templateName = '',
+  onTemplateNameChange = () => {},
+  layerSelections = {},
+  onToggleLayerSelection = () => {},
   mode = 'picker'
 }) {
   if (!selectedFile) return null
@@ -33,6 +37,22 @@ export default function FigmaConverterPanel({
     cloudinaryConfig.uploadPreset
   )
   const showCloudinaryForm = !cloudinaryComplete || cloudinaryExpanded
+  const normalizedBaseFolder = (cloudinaryConfig.folder || 'figma-exports').trim().replace(/\/+$/g, '')
+  const templatePreviewSegment = templateName.trim()
+    ? templateName.trim().replace(/\s+/g, '_')
+    : 'your_template'
+  const templateFolderPreview = normalizedBaseFolder
+    ? `${normalizedBaseFolder}/${templatePreviewSegment}`
+    : templatePreviewSegment
+  const uploadMap = React.useMemo(() => {
+    return conversionUploads.reduce((acc, upload) => {
+      if (upload?.nodeId) {
+        acc[upload.nodeId] = upload
+      }
+      return acc
+    }, {})
+  }, [conversionUploads])
+  const isLayerChecked = (nodeId) => layerSelections[nodeId] !== false
 
   return (
     <div className="figma-converter-panel">
@@ -170,6 +190,23 @@ export default function FigmaConverterPanel({
         </div>
       )}
 
+      {mode === 'details' && (
+        <div className="figma-template-field">
+          <label className="figma-team-label" htmlFor="figma-template-name">Template name</label>
+          <input
+            id="figma-template-name"
+            type="text"
+            className="figma-team-input"
+            value={templateName}
+            onChange={(event) => onTemplateNameChange(event.target.value)}
+            placeholder="e.g. campaign-hero"
+          />
+          <p className="figma-template-hint">
+            Assets will be stored under <code>{templateFolderPreview}</code>
+          </p>
+        </div>
+      )}
+
       {mode === 'details' && previewLayers && (
         <div className="figma-preflight-section">
           <div className="figma-preview-group">
@@ -181,6 +218,7 @@ export default function FigmaConverterPanel({
               <table className="figma-preview-table">
                 <thead>
                   <tr>
+                    <th className="figma-preview-check-col">Import</th>
                     <th>Layer</th>
                     <th>Variable</th>
                     <th>Dimensions</th>
@@ -188,7 +226,20 @@ export default function FigmaConverterPanel({
                 </thead>
                 <tbody>
                   {previewLayers.images.map(layer => (
-                    <tr key={layer.id}>
+                    <tr
+                      key={layer.id}
+                      className={`figma-preview-row ${isLayerChecked(layer.id) ? '' : 'is-disabled'}`}
+                    >
+                      <td className="figma-preview-check-col">
+                        <label className="figma-layer-checkbox">
+                          <input
+                            type="checkbox"
+                            checked={isLayerChecked(layer.id)}
+                            onChange={() => onToggleLayerSelection(layer.id)}
+                            disabled={isConverting}
+                          />
+                        </label>
+                      </td>
                       <td>{layer.name}</td>
                       <td>{layer.variable ? `$${layer.variable}` : 'Static'}</td>
                       <td>{layer.width && layer.height ? `${layer.width}×${layer.height}` : 'Auto'}</td>
@@ -212,6 +263,7 @@ export default function FigmaConverterPanel({
               <table className="figma-preview-table">
                 <thead>
                   <tr>
+                    <th className="figma-preview-check-col">Import</th>
                     <th>Layer</th>
                     <th>Variable</th>
                     <th>Content</th>
@@ -219,7 +271,20 @@ export default function FigmaConverterPanel({
                 </thead>
                 <tbody>
                   {previewLayers.texts.map(layer => (
-                    <tr key={layer.id}>
+                    <tr
+                      key={layer.id}
+                      className={`figma-preview-row ${isLayerChecked(layer.id) ? '' : 'is-disabled'}`}
+                    >
+                      <td className="figma-preview-check-col">
+                        <label className="figma-layer-checkbox">
+                          <input
+                            type="checkbox"
+                            checked={isLayerChecked(layer.id)}
+                            onChange={() => onToggleLayerSelection(layer.id)}
+                            disabled={isConverting}
+                          />
+                        </label>
+                      </td>
                       <td>{layer.name}</td>
                       <td>{layer.variable ? `$${layer.variable}` : 'Static'}</td>
                       <td>{layer.characters ? layer.characters.slice(0, 80) + (layer.characters.length > 80 ? '…' : '') : 'Variable placeholder'}</td>
@@ -260,25 +325,6 @@ export default function FigmaConverterPanel({
             {copySuccess && <span className="figma-copy-hint">{copySuccess}</span>}
           </div>
 
-          {!!conversionUploads.length && (
-            <div className="figma-upload-list">
-              <p className="figma-files-eyebrow">Uploaded assets</p>
-              <ul>
-                {conversionUploads.map(asset => (
-                  <li key={asset.nodeId}>
-                    <code>{asset.publicId}</code>
-                    {asset.secureUrl && (
-                      <>
-                        {' '}
-                        <a href={asset.secureUrl} target="_blank" rel="noreferrer">Preview</a>
-                      </>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
           {!!conversionResult.layers?.length && (
             <div className="figma-layers-table">
               <p className="figma-files-eyebrow">Layers</p>
@@ -295,7 +341,15 @@ export default function FigmaConverterPanel({
                     <tr key={layer.id}>
                       <td>{layer.name}</td>
                       <td>{layer.type}</td>
-                      <td>{layer.summary}</td>
+                      <td>
+                        {layer.summary}
+                        {uploadMap[layer.id]?.secureUrl && (
+                          <>
+                            {' '}
+                            <a href={uploadMap[layer.id].secureUrl} target="_blank" rel="noreferrer">Preview</a>
+                          </>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

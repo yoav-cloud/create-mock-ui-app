@@ -29,6 +29,27 @@ const WIZARD_STEPS = [
   { key: STEP.DETAILS, label: 'Import' }
 ]
 
+const sanitizeFolderSegment = (value = '') => {
+  return value
+    .trim()
+    .replace(/\s+/g, '_')
+    .replace(/[^a-zA-Z0-9_-]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/-+/g, '-')
+    .replace(/^[_-]+|[_-]+$/g, '')
+}
+
+const buildFolderPath = (baseFolder = '', templateSlug = '') => {
+  const base = (baseFolder || '').trim().replace(/\/+$/g, '')
+  if (!templateSlug) return base
+  return base ? `${base}/${templateSlug}` : templateSlug
+}
+
+const formatTemplateNameFromFrame = (frameName = '') => {
+  const trimmed = frameName.trim().replace(/\s+/g, '_')
+  return trimmed || 'template'
+}
+
 const buildStateValue = () => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return `figma-${crypto.randomUUID()}`
@@ -87,6 +108,10 @@ export default function FigmaImportModal({ isOpen, onClose }) {
   const [copySuccess, setCopySuccess] = useState('')
   const [conversionUploads, setConversionUploads] = useState([])
   const [previewLayers, setPreviewLayers] = useState(null)
+  const [templateName, setTemplateName] = useState('')
+  const [templateTouched, setTemplateTouched] = useState(false)
+  const [layerSelections, setLayerSelections] = useState({})
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
   const [cloudinaryConfig, setCloudinaryConfig] = useState(() => {
     if (!isBrowser) {
       return { cloudName: '', uploadPreset: '', folder: 'figma-exports' }
@@ -112,6 +137,7 @@ export default function FigmaImportModal({ isOpen, onClose }) {
     return !hasConfig
   })
   const authWindowRef = useRef(null)
+  const profileMenuRef = useRef(null)
 
   const clientId = import.meta.env.VITE_FIGMA_CLIENT_ID
   const clientSecret = import.meta.env.VITE_FIGMA_CLIENT_SECRET
@@ -125,6 +151,8 @@ export default function FigmaImportModal({ isOpen, onClose }) {
       if (!accessToken) {
         resetState()
       }
+    setHasHydrated(false)
+    setIsProfileMenuOpen(false)
     }
   }, [isOpen, accessToken])
 
@@ -148,6 +176,35 @@ export default function FigmaImportModal({ isOpen, onClose }) {
     }
   }, [cloudinaryConfig.cloudName, cloudinaryConfig.uploadPreset])
 
+useEffect(() => {
+  if (!isProfileMenuOpen) return
+
+  const handleClick = (event) => {
+    if (profileMenuRef.current && !profileMenuRef.current.contains(event.target)) {
+      setIsProfileMenuOpen(false)
+    }
+  }
+
+  const handleKey = (event) => {
+    if (event.key === 'Escape') {
+      setIsProfileMenuOpen(false)
+    }
+  }
+
+  document.addEventListener('mousedown', handleClick)
+  document.addEventListener('keydown', handleKey)
+  return () => {
+    document.removeEventListener('mousedown', handleClick)
+    document.removeEventListener('keydown', handleKey)
+  }
+}, [isProfileMenuOpen])
+
+useEffect(() => {
+  if (!profile) {
+    setIsProfileMenuOpen(false)
+  }
+}, [profile])
+
   const resetState = () => {
     setStep(STEP.CONNECT)
     setProfile(null)
@@ -168,6 +225,9 @@ export default function FigmaImportModal({ isOpen, onClose }) {
     setCopySuccess('')
     setIsInspectingFile(false)
     setPreviewLayers(null)
+    setTemplateName('')
+    setTemplateTouched(false)
+    setLayerSelections({})
     setCloudinaryExpanded(!(cloudinaryConfig.cloudName && cloudinaryConfig.uploadPreset))
   }
 
@@ -262,13 +322,13 @@ export default function FigmaImportModal({ isOpen, onClose }) {
     return () => window.removeEventListener('storage', handleStorageEvent)
   }, [handleStorageEvent])
 
-  useEffect(() => {
-    if (!accessToken || hasHydrated) return
-    setStep(STEP.TOKEN)
-    hydrateProfile(accessToken).catch(err => {
-      setError(err.message || 'Failed to load data from Figma.')
-    })
-  }, [accessToken, hasHydrated, hydrateProfile])
+useEffect(() => {
+  if (!isOpen || !accessToken || hasHydrated) return
+  setStep(STEP.TOKEN)
+  hydrateProfile(accessToken).catch(err => {
+    setError(err.message || 'Failed to load data from Figma.')
+  })
+}, [accessToken, hasHydrated, hydrateProfile, isOpen])
 
   useEffect(() => {
     return () => {
@@ -366,6 +426,8 @@ export default function FigmaImportModal({ isOpen, onClose }) {
     const normalizedId = String(projectId)
     setSelectedProjectId(normalizedId)
     setSelectedFile(null)
+    setTemplateName('')
+    setTemplateTouched(false)
     setFrameOptions([])
     setSelectedFrameId('')
     setFrameFilter('')
@@ -373,6 +435,7 @@ export default function FigmaImportModal({ isOpen, onClose }) {
     setConversionUploads([])
     setConversionStatus('')
     setPreviewLayers(null)
+    setLayerSelections({})
     if (projectFiles[normalizedId]) {
       return
     }
@@ -401,6 +464,8 @@ export default function FigmaImportModal({ isOpen, onClose }) {
     setSelectedProjectId(null)
     setTeamIdInput(activeTeamId || '')
     setSelectedFile(null)
+    setTemplateName('')
+    setTemplateTouched(false)
     setFrameOptions([])
     setSelectedFrameId('')
     setFrameFilter('')
@@ -408,11 +473,15 @@ export default function FigmaImportModal({ isOpen, onClose }) {
     setConversionUploads([])
     setConversionStatus('')
     setPreviewLayers(null)
+    setLayerSelections({})
   }, [activeTeamId])
 
   const handleBackToProjects = useCallback(() => {
     setStep(STEP.PROJECT)
     setPreviewLayers(null)
+    setTemplateName('')
+    setTemplateTouched(false)
+    setLayerSelections({})
   }, [])
 
   const handleInspectFile = useCallback(async (file) => {
@@ -428,6 +497,8 @@ export default function FigmaImportModal({ isOpen, onClose }) {
     setConversionUploads([])
     setConversionStatus('Loading frames…')
     setPreviewLayers(null)
+    setLayerSelections({})
+    setTemplateTouched(false)
     setSelectedFile({
       id: file.id,
       key: file.key || file.id,
@@ -458,6 +529,9 @@ export default function FigmaImportModal({ isOpen, onClose }) {
       setFileDocument(fileDetails.document)
       setFrameOptions(frames)
       setSelectedFrameId(frames[0]?.id || '')
+      if (!templateTouched && frames[0]) {
+        setTemplateName(formatTemplateNameFromFrame(frames[0].name))
+      }
       if (!frames.length) {
         setError('No frames were found in this file yet.')
         setConversionStatus('No frames available in this file.')
@@ -469,10 +543,13 @@ export default function FigmaImportModal({ isOpen, onClose }) {
       setSelectedFile(null)
       setFrameOptions([])
       setSelectedFrameId('')
+      setTemplateName('')
+      setTemplateTouched(false)
+      setLayerSelections({})
     } finally {
       setIsInspectingFile(false)
     }
-  }, [accessToken, fetchFigmaFileDetails])
+  }, [accessToken, fetchFigmaFileDetails, templateTouched])
 
   const handleProceedToDetails = useCallback(() => {
     if (!selectedFile || !fileDocument) {
@@ -518,6 +595,13 @@ export default function FigmaImportModal({ isOpen, onClose }) {
       })
     }
     setPreviewLayers(nextPreview)
+    setLayerSelections(prevSelections => {
+      const nextSelections = {}
+      templatedNodes.forEach(node => {
+        nextSelections[node.id] = prevSelections[node.id] === false ? false : true
+      })
+      return nextSelections
+    })
     setConversionResult(null)
     setConversionUploads([])
     const totalLayers = imageNodes.length + textNodes.length
@@ -543,6 +627,18 @@ export default function FigmaImportModal({ isOpen, onClose }) {
       setError('Enter your Cloudinary cloud name and unsigned upload preset.')
       return
     }
+    if (!templateName.trim()) {
+      setError('Enter a template name before creating the design.')
+      return
+    }
+    const templateSlug = sanitizeFolderSegment(templateName)
+    if (!templateSlug) {
+      setError('Template name must include at least one alphanumeric character.')
+      return
+    }
+    const baseFolder = cloudinaryConfig.folder || 'figma-exports'
+    const uploadFolder = buildFolderPath(baseFolder, templateSlug)
+
     const documentRoot = fileDocument.document || fileDocument
     const frameNode = findNodeById(documentRoot, selectedFrameId)
     if (!frameNode) {
@@ -554,6 +650,11 @@ export default function FigmaImportModal({ isOpen, onClose }) {
       setError('No layers in this frame use the # export marker. Rename nodes like "Title #headline" and try again.')
       return
     }
+    const selectedNodes = templatedNodes.filter(node => layerSelections[node.id] !== false)
+    if (!selectedNodes.length) {
+      setError('Select at least one layer to import.')
+      return
+    }
 
     setIsConverting(true)
     setConversionStatus('Fetching node previews…')
@@ -562,8 +663,8 @@ export default function FigmaImportModal({ isOpen, onClose }) {
     setCopySuccess('')
 
     try {
-      const imageNodes = templatedNodes.filter(node => node.type !== 'TEXT')
-      const textNodes = templatedNodes.filter(node => node.type === 'TEXT')
+      const imageNodes = selectedNodes.filter(node => node.type !== 'TEXT')
+      const textNodes = selectedNodes.filter(node => node.type === 'TEXT')
       let assetsMap = {}
       if (imageNodes.length) {
         const imageMap = await fetchFigmaImagesForNodes(accessToken, selectedFile.key, imageNodes.map(node => node.id))
@@ -578,7 +679,7 @@ export default function FigmaImportModal({ isOpen, onClose }) {
           const upload = await uploadImageFromUrl({
             imageUrl,
             fallbackName: node.name || node.id,
-            config: cloudinaryConfig
+            config: { ...cloudinaryConfig, folder: uploadFolder }
           })
           assetsMap[node.id] = upload
           uploads.push({ nodeId: node.id, publicId: upload.publicId, secureUrl: upload.secureUrl })
@@ -592,8 +693,11 @@ export default function FigmaImportModal({ isOpen, onClose }) {
         imageNodes,
         assetsMap
       })
+      const transformationWithDelimiter = conversion.transformation.endsWith('!!')
+        ? conversion.transformation
+        : `${conversion.transformation}/!!`
       setConversionResult({
-        transformation: conversion.transformation,
+        transformation: transformationWithDelimiter,
         frameName: frameNode.name,
         fileName: selectedFile.name,
         background: conversion.background,
@@ -620,8 +724,10 @@ export default function FigmaImportModal({ isOpen, onClose }) {
     cloudinaryConfig,
     fetchFigmaImagesForNodes,
     fileDocument,
+    layerSelections,
     selectedFile,
     selectedFrameId,
+    templateName,
     uploadImageFromUrl
   ])
 
@@ -630,6 +736,7 @@ export default function FigmaImportModal({ isOpen, onClose }) {
     setConversionStatus('Pick another frame to inspect.')
     setCopySuccess('')
     setPreviewLayers(null)
+    setLayerSelections({})
     setStep(STEP.FRAMES)
   }, [])
 
@@ -707,6 +814,7 @@ export default function FigmaImportModal({ isOpen, onClose }) {
         break
       case STEP.DETAILS:
         setPreviewLayers(null)
+        setLayerSelections({})
         setStep(STEP.FRAMES)
         break
       default:
@@ -738,6 +846,18 @@ export default function FigmaImportModal({ isOpen, onClose }) {
     setFrameFilter(value)
   }, [])
 
+  const handleTemplateNameChange = useCallback((value) => {
+    setTemplateTouched(true)
+    setTemplateName(value)
+  }, [])
+
+  const handleToggleLayerSelection = useCallback((nodeId) => {
+    setLayerSelections(prev => ({
+      ...prev,
+      [nodeId]: prev[nodeId] === false
+    }))
+  }, [])
+
   const handleSignOut = useCallback(() => {
     if (isBrowser) {
       Object.values(STORAGE_KEYS).forEach(key => {
@@ -748,18 +868,28 @@ export default function FigmaImportModal({ isOpen, onClose }) {
     setAccessToken('')
     setProfile(null)
     resetState()
-  }, [resetState])
+  setIsProfileMenuOpen(false)
+}, [resetState])
 
   const headerActions = profile ? (
-    <div className="figma-profile-menu">
-      <button type="button" className="figma-profile-chip">
+    <div
+      className={`figma-profile-menu ${isProfileMenuOpen ? 'is-open' : ''}`}
+      ref={profileMenuRef}
+    >
+      <button
+        type="button"
+        className="figma-profile-chip"
+        aria-haspopup="true"
+        aria-expanded={isProfileMenuOpen}
+        onClick={() => setIsProfileMenuOpen(prev => !prev)}
+      >
         {profile.imageUrl ? (
           <img src={profile.imageUrl} alt={`${profile.handle} avatar`} />
         ) : (
           <span>{profileInitials}</span>
         )}
       </button>
-      <div className="figma-profile-dropdown">
+      <div className={`figma-profile-dropdown ${isProfileMenuOpen ? 'is-open' : ''}`}>
         <p className="figma-profile-handle">{profile.handle}</p>
         <p className="figma-profile-email">{profile.email}</p>
         <button type="button" className="figma-secondary-btn" onClick={handleSignOut}>
@@ -769,9 +899,10 @@ export default function FigmaImportModal({ isOpen, onClose }) {
     </div>
   ) : null
 
+  const isTemplateReady = Boolean(templateName.trim())
   const footerPrimaryLabel =
-    step === STEP.DETAILS ? (isConverting ? 'Importing…' : 'Import to Cloudinary') : nextLabel
-  const footerPrimaryDisabled = step === STEP.DETAILS ? isConverting : !canGoNext
+    step === STEP.DETAILS ? (isConverting ? 'Creating…' : 'Create Design') : nextLabel
+  const footerPrimaryDisabled = step === STEP.DETAILS ? (isConverting || !isTemplateReady) : !canGoNext
   const footerPrimaryAction = step === STEP.DETAILS ? handleRunConversion : handleNextStep
 
   const footerContent = (
@@ -890,6 +1021,13 @@ export default function FigmaImportModal({ isOpen, onClose }) {
                 setConversionStatus('')
                 setCopySuccess('')
                 setPreviewLayers(null)
+                setLayerSelections({})
+                if (!templateTouched) {
+                  const nextFrame = frameOptions.find(frame => frame.id === frameId)
+                  if (nextFrame) {
+                    setTemplateName(formatTemplateNameFromFrame(nextFrame.name))
+                  }
+                }
               }}
               onCloudinaryChange={(key, value) => setCloudinaryConfig(prev => ({ ...prev, [key]: value }))}
               cloudinaryExpanded={cloudinaryExpanded}
@@ -926,6 +1064,10 @@ export default function FigmaImportModal({ isOpen, onClose }) {
               isInspectingFile={false}
               isConverting={isConverting}
               copySuccess={copySuccess}
+              templateName={templateName}
+              onTemplateNameChange={handleTemplateNameChange}
+              layerSelections={layerSelections}
+              onToggleLayerSelection={handleToggleLayerSelection}
               previewLayers={previewLayers}
               mode="details"
             />
