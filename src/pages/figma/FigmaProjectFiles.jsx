@@ -14,7 +14,8 @@ export default function FigmaProjectFiles({
   projectName,
   files = [],
   isLoading,
-  emptyState = 'Select a project to see its files.'
+  emptyState = 'Select a project to see its files.',
+  onConvert
 }) {
   if (!projectName) {
     return <p className="figma-empty-state">{emptyState}</p>
@@ -51,6 +52,17 @@ export default function FigmaProjectFiles({
             <div className="figma-file-card-body">
               <p className="figma-file-name">{file.name}</p>
               <p className="figma-file-meta">Last modified: {formatDate(file.lastModified)}</p>
+              {onConvert && (
+                <div className="figma-file-actions">
+                  <button
+                    type="button"
+                    className="figma-secondary-btn"
+                    onClick={() => onConvert?.(file)}
+                  >
+                    Inspect
+                  </button>
+                </div>
+              )}
             </div>
           </article>
         ))}
@@ -58,5 +70,4 @@ export default function FigmaProjectFiles({
     </div>
   )
 }
-
 

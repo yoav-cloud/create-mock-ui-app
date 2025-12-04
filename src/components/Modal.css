@@ -19,7 +19,6 @@
   width: 100%;
   max-width: 500px;
   max-height: 90vh;
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
 }
@@ -34,6 +33,26 @@
   align-items: center;
   padding: var(--spacing-lg);
   border-bottom: 1px solid var(--color-border);
+  gap: var(--spacing-md);
+}
+
+.modal-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.modal-subtitle {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+}
+
+.modal-header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
 }
 
 .modal-title {
@@ -66,6 +85,19 @@
 
 .modal-body {
   padding: var(--spacing-lg);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modal-body-static {
+  flex: 0 0 auto;
+}
+
+.modal-body-content {
+  flex: 1 1 auto;
+  overflow-y: auto;
 }
 
 .modal-form-group {
@@ -108,12 +140,12 @@
   min-height: 100px;
 }
 
-.modal-actions {
-  display: flex;
-  gap: var(--spacing-md);
-  justify-content: flex-end;
-  padding-top: var(--spacing-md);
+.modal-footer {
+  padding: var(--spacing-lg);
   border-top: 1px solid var(--color-border);
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-md);
 }
 
 .modal-radio-group {

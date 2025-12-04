@@ -14,7 +14,7 @@ import Preferences from './pages/Preferences'
 import DesignPlayground from './pages/DesignPlayground'
 import PlaygroundDesignView from './pages/playground/PlaygroundDesignView'
 import PlaygroundReviewView from './pages/playground/PlaygroundReviewView'
-import FigmaAuthRedirect from './pages/playground/FigmaAuthRedirect'
+import FigmaAuthRedirect from './pages/figma/FigmaAuthRedirect'
 
 function App() {
   return (

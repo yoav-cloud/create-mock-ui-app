@@ -12,7 +12,7 @@ import { getAllFieldNames, getFieldDefaultValue, getFieldMetadataSyntax } from '
 import { extractLayers, isTextLayer, isImageLayer } from '../utils/layerUtils'
 import { shouldInheritProperty } from '../utils/inheritanceUtils'
 import { createRuleUpdateHandler } from '../utils/ruleUpdateUtils'
-import FigmaImportModal from './playground/FigmaImportModal'
+import FigmaImportModal from './figma/FigmaImportModal'
 
 function DesignPlayground() {
   const [selectedAsset, setSelectedAsset] = useState(() => {

@@ -9,9 +9,12 @@ function Modal({
   isOpen,
   onClose,
   title,
+  subtitle = null,
   children,
   size = 'default',
-  contentClassName = ''
+  contentClassName = '',
+  headerActions = null,
+  footerContent = null
 }) {
   if (!isOpen) return null
 
@@ -27,12 +30,19 @@ function Modal({
     <div className="modal-overlay" onClick={onClose}>
       <div className={contentClasses.join(' ')} onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h3 className="modal-title">{title}</h3>
-          <button className="modal-close" onClick={onClose}>
-            ×
-          </button>
+          <div className="modal-header-left">
+            {title && <h3 className="modal-title">{title}</h3>}
+            {subtitle && <p className="modal-subtitle">{subtitle}</p>}
+          </div>
+          <div className="modal-header-right">
+            {headerActions}
+            <button className="modal-close" onClick={onClose} type="button">
+              ×
+            </button>
+          </div>
         </div>
         <div className="modal-body">{children}</div>
+        {footerContent && <div className="modal-footer">{footerContent}</div>}
       </div>
     </div>
   )
