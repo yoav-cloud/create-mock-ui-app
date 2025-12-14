@@ -8,7 +8,7 @@ import FigmaConverterPanel from './FigmaConverterPanel'
 import FigmaWizardSteps from './FigmaWizardSteps'
 import { fetchFigmaProfile, fetchTeamProjects, fetchProjectFiles, fetchFigmaFileDetails, fetchFigmaImagesForNodes } from './figmaApi'
 import { uploadImageFromUrl } from './cloudinaryUploads'
-import { collectFramesFromDocument, extractTemplatedNodes, findNodeById, buildTransformationForFrame, extractVariableFromName, buildDesignRulesFromNodes } from './figmaConversionUtils'
+import { collectFramesFromDocument, extractTemplatedNodes, findNodeById, buildTransformationForFrame, extractVariableFromName, buildDesignRulesFromNodes, buildDesignRulesWithChildren } from './figmaConversionUtils'
 
 const STEP = {
   CONNECT: 'connect',
@@ -748,10 +748,15 @@ useEffect(() => {
         assetsMap,
         mainProductLayerId: requiresMainProduct ? mainProductLayerId : null
       })
+      const allDesignRules = buildDesignRulesWithChildren(designRulesResult.rules)
+      if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
+        console.log('[Figma] Imported Design Rules (Full JSON):', JSON.stringify(allDesignRules, null, 2))
+      }
       onTemplateImported({
         templateName: templateName.trim() || selectedFile.name,
         transformation: finalTransformation,
-        designRules: { parent: designRulesResult.rules },
+        designRules: allDesignRules,
         fonts: designRulesResult.fonts
       })
       // Small delay to show the "Importing to Playground..." message

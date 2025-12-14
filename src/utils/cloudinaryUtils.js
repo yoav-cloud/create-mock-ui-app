@@ -12,6 +12,24 @@ export function escapeCloudinaryString(str) {
 }
 
 /**
+ * Cloudinary user-defined variable values inside `!...!` are effectively URL-decoded
+ * by the time Cloudinary parses transformations, so values should be double-encoded.
+ */
+export function doubleEscapeCloudinaryString(str) {
+  const once = encodeURIComponent(str).replace(/!/g, '%21')
+  return encodeURIComponent(once).replace(/!/g, '%21')
+}
+
+export function normalizeCloudinaryNumber(value, fallback = 0) {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  const raw = value == null ? '' : String(value)
+  // Allow inputs like "$55", " 1,299.50 ", "€42" → 55, 1299.5, 42
+  const cleaned = raw.replace(/[^0-9.+-]/g, '')
+  const parsed = Number.parseFloat(cleaned)
+  return Number.isFinite(parsed) ? parsed : fallback
+}
+
+/**
  * Gets default value for a field, handling metadata syntax
  * @param {string} field - Field name
  * @param {Object} formValues - Current form values

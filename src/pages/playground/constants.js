@@ -22,30 +22,6 @@ export const ASSETS = [
   }
 ]
 
-export const DESIGN_TYPES = [
-  {
-    id: 'parent',
-    name: 'Main Design',
-    width: 500,
-    height: 900,
-    description: 'Vertical layout (500x900)'
-  },
-  {
-    id: 'ig-ad',
-    name: 'Instagram Ad',
-    width: 1080,
-    height: 1080,
-    description: 'Square format (1:1)'
-  },
-  {
-    id: 'fb-mobile',
-    name: 'FB Mobile Feed',
-    width: 1080,
-    height: 1350,
-    description: 'Vertical format (4:5)'
-  }
-]
-
 export const BASE_WIDTH = 500
 
 export const GRAVITY_VALUES = {
@@ -59,6 +35,44 @@ export const GRAVITY_VALUES = {
   east: 'east',
   center: 'center'
 }
+
+export const DESIGN_TYPES = [
+  {
+    id: 'parent',
+    name: 'Main Design',
+    width: 500,
+    height: 900,
+    description: 'Vertical layout (500x900)'
+  },
+  {
+    id: 'ig-ad',
+    name: 'Instagram Ad',
+    width: 1080,
+    height: 1080,
+    description: 'Square format (1:1)',
+    recommended: {
+      title: { x: 0, y: 80, gravity: GRAVITY_VALUES.north, fontSize: 60, textWidth: 864 },
+      tagline: { x: 0, y: 100, gravity: GRAVITY_VALUES.north, fontSize: 36, textWidth: 864 },
+      product: { width: 600, height: 600, x: 0, y: 200, gravity: GRAVITY_VALUES.center },
+      price: { x: 0, y: 50, gravity: GRAVITY_VALUES.south, fontSize: 72 },
+      logo: { width: 200, height: 200, x: 20, y: 20, gravity: GRAVITY_VALUES.northEast }
+    }
+  },
+  {
+    id: 'fb-mobile',
+    name: 'FB Mobile Feed',
+    width: 1080,
+    height: 1350,
+    description: 'Vertical format (4:5)',
+    recommended: {
+      title: { x: 0, y: 60, gravity: GRAVITY_VALUES.north, fontSize: 64, textWidth: 864 },
+      tagline: { x: 0, y: 120, gravity: GRAVITY_VALUES.north, fontSize: 40, textWidth: 864 },
+      product: { width: 700, height: 700, x: 0, y: 0, gravity: GRAVITY_VALUES.center },
+      price: { x: 0, y: 80, gravity: GRAVITY_VALUES.south, fontSize: 80 },
+      logo: { width: 200, height: 200, x: 20, y: 20, gravity: GRAVITY_VALUES.northEast }
+    }
+  }
+]
 
 // Google Fonts list - 15 popular fonts
 export const GOOGLE_FONTS = [

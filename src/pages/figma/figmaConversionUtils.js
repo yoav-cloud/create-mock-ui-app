@@ -1,6 +1,6 @@
 const TEMPLATE_MARKER = '#'
 
-import { GRAVITY_VALUES } from '../playground/constants'
+import { GRAVITY_VALUES, DESIGN_TYPES } from '../playground/constants'
 
 const sanitizeVariableName = (name = '') => {
   return name
@@ -109,13 +109,58 @@ const buildTextLayer = (node, frame) => {
   let variableDefinition = null
   
   if (variable) {
-    // URL encode the text value for Cloudinary variable syntax
-    // The value between !...! delimiters should be URL encoded
-    const urlEncodedValue = encodeURIComponent(text)
-    variableDefinition = `$${variable}_!${urlEncodedValue}!`
+    // For variable definitions, the value between !...! must be double-encoded
+    // to handle special characters like $, /, etc. that could break Cloudinary's transformation parsing
+    // CRITICAL: Must use nested encodeURIComponent calls to ensure proper double-encoding
+    // Example: "$55" -> "%2455" -> "%252455"
+    let rawText = text || ''
+    
+    // Ensure we're working with raw text (decode if already encoded)
+    // This handles cases where Figma might return already-encoded text
+    try {
+      // If text contains encoded characters and can be decoded, decode it first
+      if (rawText.includes('%') && /%[0-9A-Fa-f]{2}/.test(rawText)) {
+        const decoded = decodeURIComponent(rawText)
+        // Only use decoded if it's different (was actually encoded)
+        if (decoded !== rawText) {
+          rawText = decoded
+        }
+      }
+    } catch (e) {
+      // If decoding fails, use original text
+      // This means it wasn't encoded or had invalid encoding
+    }
+    
+    // First encoding: converts special chars to %XX format
+    // "$55" becomes "%2455"
+    const firstEncode = encodeURIComponent(rawText)
+    
+    // Second encoding: encodes the % from first encoding to %25
+    // "%2455" becomes "%252455"
+    const doubleEncodedValue = encodeURIComponent(firstEncode)
+    
+    // Verify encoding in dev mode
+    if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console
+      console.log(`[Figma] Encoding variable "${variable}":`, {
+        original: text,
+        raw: rawText,
+        firstEncode,
+        doubleEncode: doubleEncodedValue,
+        variableDef: `$${variable}_!${doubleEncodedValue}!`
+      })
+    }
+    
+    variableDefinition = `$${variable}_!${doubleEncodedValue}!`
+    // For variable references in the overlay, use the variable directly (no encoding needed)
     encodedText = `$(${variable})`
   } else {
-    encodedText = encodeURIComponent(text || node.name || 'Text')
+    // For static text, double-encode to handle special characters like slashes
+    // This prevents Cloudinary from interpreting slashes as transformation separators
+    // Use nested encodeURIComponent calls to ensure proper double-encoding
+    const textToEncode = text || node.name || 'Text'
+    const firstEncode = encodeURIComponent(textToEncode)
+    encodedText = encodeURIComponent(firstEncode)
   }
 
   const overlay = [
@@ -207,6 +252,12 @@ export const buildTransformationForFrame = ({ frameNode, textNodes = [], imageNo
     const layer = buildTextLayer(node, frameNode)
     layers.push(layer)
     if (layer.variableDefinition) {
+      // Ensure variable definition is properly double-encoded
+      // Log in dev mode to verify encoding
+      if (import.meta.env.DEV && layer.variable) {
+        // eslint-disable-next-line no-console
+        console.log(`[Figma] Variable ${layer.variable} definition:`, layer.variableDefinition)
+      }
       variableDefinitions.push(layer.variableDefinition)
     }
     overlays.push(layer.overlay)
@@ -225,6 +276,14 @@ export const buildTransformationForFrame = ({ frameNode, textNodes = [], imageNo
 
   const transformation = [...variableDefinitions, ...baseSegments, ...overlays].filter(Boolean).join('/')
 
+  // Log final transformation in dev mode to verify encoding
+  if (import.meta.env.DEV && variableDefinitions.length > 0) {
+    // eslint-disable-next-line no-console
+    console.log('[Figma] Final transformation string:', transformation)
+    // eslint-disable-next-line no-console
+    console.log('[Figma] Variable definitions:', variableDefinitions)
+  }
+
   return {
     transformation,
     background,
@@ -233,7 +292,18 @@ export const buildTransformationForFrame = ({ frameNode, textNodes = [], imageNo
 }
 
 const cleanLayerName = (name = '') => {
-  return name.replace(/#[^#]+$/, '').trim() || 'Layer'
+  if (!name || typeof name !== 'string') return 'Layer'
+  // Remove the #variable part but keep the rest of the name
+  // Handle cases like "Title #headline" -> "Title"
+  // Or "#headline" -> use a fallback
+  let cleaned = name.replace(/#[^\s#]+/g, '').trim()
+  // If after removing #variable we have nothing, try to get the part before #
+  if (!cleaned) {
+    const beforeHash = name.split('#')[0].trim()
+    cleaned = beforeHash || name.trim()
+  }
+  // If still empty or just whitespace, return a default
+  return cleaned || 'Layer'
 }
 
 const toCamelCase = (value = '') => {
@@ -288,7 +358,20 @@ export const buildDesignRulesFromNodes = ({
   const fonts = new Set()
   const usedKeys = new Set(['width', 'height', 'backgroundColor'])
 
-  nodes.forEach((node, index) => {
+  // Filter out original price layers
+  const filteredNodes = nodes.filter(node => {
+    const name = (node.name || '').toLowerCase()
+    const variable = extractVariableFromName(node.name)
+    const variableLower = (variable || '').toLowerCase()
+    // Exclude if name or variable contains original price patterns
+    return !name.includes('original') && 
+           !name.includes('orig') && 
+           !variableLower.includes('original') && 
+           !variableLower.includes('origprice') &&
+           !variableLower.includes('orig')
+  })
+
+  filteredNodes.forEach((node, index) => {
     const relative = getRelativeBox(node, frameNode)
     const variableName = extractVariableFromName(node.name)
     const baseKey = variableName || toCamelCase(node.name)
@@ -344,6 +427,179 @@ export const buildDesignRulesFromNodes = ({
   return {
     rules,
     fonts: Array.from(fonts)
+  }
+}
+
+// Identify layer type based on key name and properties
+const identifyLayerType = (layerKey, layerData) => {
+  const keyLower = layerKey.toLowerCase()
+  const displayNameLower = (layerData?.displayName || '').toLowerCase()
+  
+  // Check for logo
+  if (keyLower.includes('logo') || displayNameLower.includes('logo') || layerData?.isLogo) {
+    return 'logo'
+  }
+  
+  // Check for product/main image
+  if (keyLower.includes('product') || keyLower.includes('image') || keyLower.includes('main') || 
+      displayNameLower.includes('product') || displayNameLower.includes('main') || 
+      layerData?.isMainProduct) {
+    return 'product'
+  }
+  
+  // Check for price
+  if (keyLower.includes('price') || displayNameLower.includes('price')) {
+    return 'price'
+  }
+  
+  // Check for title
+  if (keyLower.includes('title') || keyLower.includes('headline') || displayNameLower.includes('title') || displayNameLower.includes('headline')) {
+    return 'title'
+  }
+  
+  // Check for tagline
+  if (keyLower.includes('tagline') || keyLower.includes('subtitle') || keyLower.includes('description') || 
+      displayNameLower.includes('tagline') || displayNameLower.includes('subtitle')) {
+    return 'tagline'
+  }
+  
+  return null
+}
+
+const generateChildDesign = (parentRules, childId, childDimensions) => {
+  if (!parentRules || !childDimensions) return null
+
+  const childRules = {
+    width: childDimensions.width,
+    height: childDimensions.height,
+    backgroundColor: parentRules.backgroundColor || '#000428'
+  }
+
+  // Get recommended positions/sizes for this child design type
+  const designType = DESIGN_TYPES.find(dt => dt.id === childId)
+  const recommended = designType?.recommended || {}
+
+  // Calculate scale ratios from parent to child
+  const parentWidth = parentRules.width || 500
+  const parentHeight = parentRules.height || 900
+  const childWidth = childDimensions.width
+  const childHeight = childDimensions.height
+  
+  const widthRatio = childWidth / parentWidth
+  const heightRatio = childHeight / parentHeight
+  // Use average ratio for balanced scaling
+  const scaleRatio = (widthRatio + heightRatio) / 2
+
+  // Copy all layers from parent and scale/position appropriately
+  Object.keys(parentRules).forEach(key => {
+    if (key === 'width' || key === 'height' || key === 'backgroundColor') return
+
+    const parentLayer = parentRules[key]
+    if (!parentLayer || typeof parentLayer !== 'object') return
+
+    // Deep copy the layer to avoid reference issues
+    const childLayer = JSON.parse(JSON.stringify(parentLayer))
+    
+    // Identify layer type
+    const layerType = identifyLayerType(key, parentLayer)
+    
+    // Use recommended values if available, otherwise scale from parent
+    if (layerType && recommended[layerType]) {
+      const rec = recommended[layerType]
+      
+      // Apply recommended values
+      if (rec.x !== undefined) childLayer.x = rec.x
+      if (rec.y !== undefined) childLayer.y = rec.y
+      if (rec.gravity !== undefined) childLayer.gravity = rec.gravity
+      if (rec.fontSize !== undefined) childLayer.fontSize = rec.fontSize
+      if (rec.textWidth !== undefined) childLayer.textWidth = rec.textWidth
+      if (rec.width !== undefined) childLayer.width = rec.width
+      if (rec.height !== undefined) childLayer.height = rec.height
+    } else {
+      // Scale from parent using ratios
+      if (typeof childLayer.x === 'number') {
+        childLayer.x = Math.round(childLayer.x * widthRatio)
+      }
+      if (typeof childLayer.y === 'number') {
+        childLayer.y = Math.round(childLayer.y * heightRatio)
+      }
+      if (typeof childLayer.width === 'number') {
+        childLayer.width = Math.round(childLayer.width * widthRatio)
+      }
+      if (typeof childLayer.height === 'number') {
+        childLayer.height = Math.round(childLayer.height * heightRatio)
+      }
+      if (typeof childLayer.fontSize === 'number') {
+        childLayer.fontSize = Math.round(childLayer.fontSize * scaleRatio)
+      }
+      if (typeof childLayer.textWidth === 'number') {
+        childLayer.textWidth = Math.round(childLayer.textWidth * widthRatio)
+      }
+    }
+
+    // Ensure layer fits within canvas bounds
+    const layerX = childLayer.x || 0
+    const layerY = childLayer.y || 0
+    const layerWidth = childLayer.width || 0
+    const layerHeight = childLayer.height || 0
+
+    // Calculate the right and bottom edges of the layer
+    const layerRight = layerX + layerWidth
+    const layerBottom = layerY + layerHeight
+
+    // Adjust X position if layer overflows to the right
+    if (layerRight > childWidth) {
+      const overflowX = layerRight - childWidth
+      childLayer.x = Math.max(0, layerX - overflowX)
+    }
+    // Ensure layer doesn't start outside left boundary
+    if (childLayer.x < 0) {
+      childLayer.x = 0
+    }
+
+    // Adjust Y position if layer overflows to the bottom
+    if (layerBottom > childHeight) {
+      const overflowY = layerBottom - childHeight
+      childLayer.y = Math.max(0, layerY - overflowY)
+    }
+    // Ensure layer doesn't start outside top boundary
+    if (childLayer.y < 0) {
+      childLayer.y = 0
+    }
+
+    // If layer is still too large, clamp width/height to canvas size
+    if (childLayer.width && childLayer.width > childWidth) {
+      childLayer.width = childWidth
+      childLayer.x = 0
+    }
+    if (childLayer.height && childLayer.height > childHeight) {
+      childLayer.height = childHeight
+      childLayer.y = 0
+    }
+
+    // For text layers, also check textWidth
+    if (childLayer.textWidth && childLayer.textWidth > childWidth) {
+      childLayer.textWidth = childWidth
+    }
+
+    childRules[key] = childLayer
+  })
+
+  return childRules
+}
+
+export const buildDesignRulesWithChildren = (parentRules) => {
+  if (!parentRules || !parentRules.width || !parentRules.height) {
+    return { parent: parentRules || {}, 'ig-ad': {}, 'fb-mobile': {} }
+  }
+
+  const igAdRules = generateChildDesign(parentRules, 'ig-ad', { width: 1080, height: 1080 })
+  const fbMobileRules = generateChildDesign(parentRules, 'fb-mobile', { width: 1080, height: 1350 })
+
+  return {
+    parent: parentRules,
+    'ig-ad': igAdRules || {},
+    'fb-mobile': fbMobileRules || {}
   }
 }
 

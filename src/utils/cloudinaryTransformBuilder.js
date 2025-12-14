@@ -1,7 +1,6 @@
 import { calculateFontSize, fontToKebabCase, buildTextFlags } from './fontUtils'
 import { hexToRgb } from './colorUtils'
 import { extractLayers, isTextLayer, isImageLayer, getLayerTextContent, getTextFormatting, getLayerVariableName } from './layerUtils'
-import { escapeCloudinaryString } from './cloudinaryUtils'
 import { GRAVITY_VALUES, CLOUDINARY_BASE_URL } from '../pages/playground/constants'
 
 /**
@@ -55,12 +54,19 @@ export function buildCloudinaryTransform({
   getBackgroundColorValue,
   buildFieldLogicLocal
 }) {
-  const scale = selectedDesign.width / baseWidth
+  // Use the actual canvas dimensions for scaling, not selectedDesign.width
+  // This ensures child designs use their own dimensions, not the parent's
+  const actualWidth = canvasDimensions.width || rules.width || selectedDesign.width || baseWidth
+  const actualHeight = canvasDimensions.height || rules.height || selectedDesign.height || baseWidth
+  
+  // Scale based on actual canvas width, not selectedDesign.width
+  // This is important for child designs which have different dimensions
+  const scale = actualWidth / baseWidth
   const s = (val) => Math.round(val * scale)
   
-  // Get canvas dimensions
-  const padW = canvasDimensions.width || rules.width
-  const padH = canvasDimensions.height || rules.height
+  // Get canvas dimensions for c_pad - use actual dimensions
+  const padW = actualWidth
+  const padH = actualHeight
   
   // Extract layers dynamically
   const layers = extractLayers(rules)
@@ -82,16 +88,12 @@ export function buildCloudinaryTransform({
     
     // Get default value
     const defaultValue = getDefaultValue(fieldName, formValues, useMetadata, savedValues)
-    // Escape string values for Cloudinary (but not numbers)
-    const escapedDefault = typeof defaultValue === 'string' && !isNumber
-      ? escapeCloudinaryString(defaultValue)
-      : defaultValue
     
     // Get metadata key
     const metaKey = getMetaKeyForField(fieldName, formValues)
     
     // Build variable definition
-    const varDef = buildFieldLogicLocal(varName, metaKey, escapedDefault, isNumber)
+    const varDef = buildFieldLogicLocal(varName, metaKey, defaultValue, isNumber)
     variableDefs.push(varDef)
   })
   

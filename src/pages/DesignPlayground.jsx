@@ -6,7 +6,7 @@ import { ASSETS, DESIGN_TYPES, DESIGN_RULES as DEFAULT_DESIGN_RULES, GRAVITY_VAL
 import AssetSwitcher from './playground/AssetSwitcher'
 import { parseUrlSegments as parseUrlSegmentsUtil, generateLayerConfig, extractLayersFromRules } from '../utils/urlParser'
 import { extractMetadataId, hasMetadataSyntax, getMetadataKey } from '../utils/metadataUtils'
-import { escapeCloudinaryString, getDefaultValue, shouldUseMetadata, getMetaKeyForField, getBackgroundColorValue } from '../utils/cloudinaryUtils'
+import { escapeCloudinaryString, getDefaultValue, shouldUseMetadata, getMetaKeyForField, getBackgroundColorValue, doubleEscapeCloudinaryString, normalizeCloudinaryNumber } from '../utils/cloudinaryUtils'
 import { buildCloudinaryTransform } from '../utils/cloudinaryTransformBuilder'
 import { getAllFieldNames, getFieldDefaultValue, getFieldMetadataSyntax } from '../utils/fieldMetadataUtils'
 import { extractLayers, isTextLayer, isImageLayer } from '../utils/layerUtils'
@@ -393,7 +393,9 @@ function DesignPlayground() {
       ? defaultValue
       : (isNumber ? 0 : ' ')
 
-    const defaultValFormatted = isNumber ? safeDefault : `!${safeDefault}!`
+    const defaultValFormatted = isNumber
+      ? normalizeCloudinaryNumber(safeDefault, 0)
+      : `!${doubleEscapeCloudinaryString(String(safeDefault))}!`
 
     // Check if we should use metadata (either toggle is on, or value contains {metadata})
     const useMeta = shouldUseMetadata(varName, debouncedValues, debouncedUseMetadata)
