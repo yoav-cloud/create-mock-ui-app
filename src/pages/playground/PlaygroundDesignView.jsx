@@ -13,8 +13,10 @@ export default function PlaygroundDesignView() {
   }
 
   const {
+    designTypes,
     selectedDesign,
     setSelectedDesign,
+    openAICreateChildDesignModal,
     canvasDimensions,
     setCanvasDimensions,
     inheritanceToggles,
@@ -67,6 +69,8 @@ export default function PlaygroundDesignView() {
       <DesignSelector
         selectedDesign={selectedDesign}
         onDesignChange={setSelectedDesign}
+        designTypes={designTypes}
+        onAddChildDesign={openAICreateChildDesignModal}
         canvasDimensions={canvasDimensions}
         inheritanceToggles={inheritanceToggles}
         onInheritanceToggleChange={setInheritanceToggles}

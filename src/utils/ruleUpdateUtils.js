@@ -1,4 +1,3 @@
-import { DESIGN_TYPES } from '../pages/playground/constants'
 import { shouldInheritProperty } from './inheritanceUtils'
 
 /**
@@ -13,6 +12,7 @@ import { shouldInheritProperty } from './inheritanceUtils'
  * @param {Function} params.setFormValues - State setter for form values
  * @param {Object} params.inheritanceToggles - Inheritance toggle state
  * @param {Function} params.isPropertyOverridden - Function to check if property is overridden
+ * @param {Function} params.getChildDesignIds - Returns array of child design IDs (excluding 'parent')
  * @returns {Function} Rule update handler function
  */
 export function createRuleUpdateHandler({
@@ -24,7 +24,8 @@ export function createRuleUpdateHandler({
   setModifiedLayers,
   setFormValues,
   inheritanceToggles,
-  isPropertyOverridden
+  isPropertyOverridden,
+  getChildDesignIds
 }) {
   /**
    * Helper to propagate parent property change to children
@@ -36,7 +37,7 @@ export function createRuleUpdateHandler({
     if (!shouldInherit) return newRules
 
     // Get child design IDs
-    const childDesigns = DESIGN_TYPES.filter(d => d.id !== 'parent').map(d => d.id)
+    const childDesigns = (typeof getChildDesignIds === 'function' ? getChildDesignIds() : [])
 
     childDesigns.forEach(childId => {
       // Only propagate if child doesn't have an override

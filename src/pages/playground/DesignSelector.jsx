@@ -1,23 +1,25 @@
 import React, { useState } from 'react'
-import { DESIGN_TYPES } from './constants'
 import './DesignSelector.css'
 
 export default function DesignSelector({ 
   selectedDesign, 
   onDesignChange, 
+  designTypes,
+  onAddChildDesign,
   canvasDimensions,
   inheritanceToggles,
   onInheritanceToggleChange,
   getRulesForDesign
 }) {
   const [isParentHovered, setIsParentHovered] = useState(false)
+  const types = Array.isArray(designTypes) && designTypes.length ? designTypes : []
 
   return (
     <div className="design-selector">
       <h3>Channels</h3>
       <div className="design-tree">
         {/* Parent Design */}
-        {DESIGN_TYPES.filter(d => d.id === 'parent').map(design => {
+        {types.filter(d => d.id === 'parent').map(design => {
           const rules = getRulesForDesign ? getRulesForDesign(design.id) : {}
           const isSelected = selectedDesign.id === design.id
           const displayWidth = isSelected ? canvasDimensions.width : (rules.width || design.width)
@@ -76,7 +78,7 @@ export default function DesignSelector({
         })}
         {/* Sub-designs */}
         <div className="sub-designs-container">
-          {DESIGN_TYPES.filter(d => d.id !== 'parent').map((design) => {
+          {types.filter(d => d.id !== 'parent').map((design) => {
             const rules = getRulesForDesign ? getRulesForDesign(design.id) : {}
             const isSelected = selectedDesign.id === design.id
             const displayWidth = isSelected ? canvasDimensions.width : (rules.width || design.width)
@@ -106,6 +108,20 @@ export default function DesignSelector({
               </div>
             )
           })}
+          {typeof onAddChildDesign === 'function' && (
+            <div className="sub-design-wrapper">
+              <button
+                type="button"
+                className="design-option sub"
+                onClick={onAddChildDesign}
+                title="Create a new child design from the parent using AI"
+                style={{ cursor: 'pointer' }}
+              >
+                <div className="design-name">+ Add child design</div>
+                <div className="design-dims">AI</div>
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

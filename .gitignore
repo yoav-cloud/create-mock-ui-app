@@ -26,3 +26,6 @@ dist-ssr
 .env
 
 figma-example
+
+# Local scripts / scratch space (keep out of git)
+test/

@@ -14,6 +14,10 @@ import { shouldInheritProperty } from '../utils/inheritanceUtils'
 import { createRuleUpdateHandler } from '../utils/ruleUpdateUtils'
 import FigmaImportModal from './figma/FigmaImportModal'
 import NewDesignModal from './playground/NewDesignModal'
+import AICreateChildDesignModal from './playground/AICreateChildDesignModal'
+import { fetchImageAsBase64 } from './playground/imageBase64'
+import { createChildDesignWithAI } from './playground/aiDesignCreatorApi'
+import { computePropertyOverridesForChild } from './playground/propertyOverridesFromRules'
 
 const cloneDesignRules = () => JSON.parse(JSON.stringify(DEFAULT_DESIGN_RULES))
 
@@ -27,6 +31,26 @@ const mergeFontOptions = (current = [], incoming = []) => {
 
 function DesignPlayground() {
   const defaultRulesRef = useRef(cloneDesignRules())
+  const [designTypes, setDesignTypes] = useState(() => {
+    const saved = localStorage.getItem('playground_design_types')
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved)
+        if (Array.isArray(parsed) && parsed.length) {
+          const byId = new Map()
+          ;[...DESIGN_TYPES, ...parsed].forEach((d) => {
+            if (d?.id) byId.set(d.id, d)
+          })
+          const merged = Array.from(byId.values())
+          merged.sort((a, b) => (a.id === 'parent' ? -1 : b.id === 'parent' ? 1 : 0))
+          return merged
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return [...DESIGN_TYPES]
+  })
   const [selectedAsset, setSelectedAsset] = useState(() => {
     const saved = localStorage.getItem('playground_asset')
     return saved ? ASSETS.find(a => a.id === saved) || ASSETS[2] : ASSETS[2]
@@ -34,13 +58,14 @@ function DesignPlayground() {
 
   const [selectedDesign, setSelectedDesign] = useState(() => {
     const saved = localStorage.getItem('playground_design')
-    return saved ? DESIGN_TYPES.find(d => d.id === saved) || DESIGN_TYPES[0] : DESIGN_TYPES[0]
+    return saved ? designTypes.find(d => d.id === saved) || designTypes[0] : designTypes[0]
   })
 
   const [designName, setDesignName] = useState('Shoes Ad Example')
 
   const [isNewDesignModalOpen, setIsNewDesignModalOpen] = useState(false)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+  const [isAICreateChildModalOpen, setIsAICreateChildModalOpen] = useState(false)
 
   const [formValues, setFormValues] = useState(() => {
     const saved = localStorage.getItem('playground_form')
@@ -96,8 +121,12 @@ function DesignPlayground() {
         const parsed = JSON.parse(saved)
         // Merge with DESIGN_RULES to ensure all properties exist
         const merged = {}
-        Object.keys(defaultRulesRef.current).forEach(designId => {
-          const designRule = defaultRulesRef.current[designId]
+        const designIds = new Set([
+          ...Object.keys(defaultRulesRef.current),
+          ...Object.keys(parsed || {})
+        ])
+        designIds.forEach(designId => {
+          const designRule = defaultRulesRef.current[designId] || parsed[designId] || {}
           const savedRule = parsed[designId] || {}
 
           // Deep merge layer properties dynamically
@@ -265,6 +294,18 @@ function DesignPlayground() {
   }, [selectedDesign])
 
   useEffect(() => {
+    localStorage.setItem('playground_design_types', JSON.stringify(designTypes))
+  }, [designTypes])
+
+  useEffect(() => {
+    if (!selectedDesign?.id) return
+    const exists = designTypes.some(d => d.id === selectedDesign.id)
+    if (!exists) {
+      setSelectedDesign(designTypes.find(d => d.id === 'parent') || designTypes[0] || DESIGN_TYPES[0])
+    }
+  }, [designTypes, selectedDesign?.id])
+
+  useEffect(() => {
     localStorage.setItem('playground_form', JSON.stringify(formValues))
   }, [formValues])
 
@@ -330,7 +371,7 @@ function DesignPlayground() {
     if (needsUpdate) {
       setFormValues(prev => ({ ...prev, ...updates }))
     }
-  }, [])
+  }, [designTypes])
 
   // Sync toggle state with formValues on mount (in case formValues already contain {metadata})
   useEffect(() => {
@@ -362,7 +403,7 @@ function DesignPlayground() {
         ...syncUpdates
       }))
     }
-  }, [])
+  }, [designTypes])
 
   // Debounced values for the URL generation
   const [debouncedValues, setDebouncedValues] = useState(formValues)
@@ -467,6 +508,103 @@ function DesignPlayground() {
     buildFieldLogicLocal
   ])
 
+  const normalizeRulesForTextDefaults = useCallback((designRule) => {
+    if (!designRule) return designRule
+    const next = JSON.parse(JSON.stringify(designRule))
+    Object.keys(next).forEach(key => {
+      const layer = next[key]
+      if (layer && typeof layer === 'object' && 'fontSize' in layer) {
+        if (layer.textWrap !== false && !layer.textWidth) {
+          layer.textWidth = Math.round((next.width || 500) * 0.8)
+        }
+        if (layer.textWrap === undefined) {
+          layer.textWrap = true
+        }
+      }
+    })
+    return next
+  }, [])
+
+  const mergeRulesWithParent = useCallback((parent, child) => {
+    const out = { ...(parent || {}), ...(child || {}) }
+    Object.keys(out).forEach((k) => {
+      const pv = parent?.[k]
+      const cv = child?.[k]
+      if (pv && cv && typeof pv === 'object' && typeof cv === 'object' && !Array.isArray(pv) && !Array.isArray(cv)) {
+        out[k] = { ...pv, ...cv }
+      }
+    })
+    return out
+  }, [])
+
+  const handleCreateChildDesignWithAI = useCallback(async (adType) => {
+    const endpointUrl = import.meta.env.VITE_DESIGN_CREATOR_LAMBDA_URL
+    if (!endpointUrl) {
+      throw new Error('Missing VITE_DESIGN_CREATOR_LAMBDA_URL')
+    }
+
+    const parentDesignObj = designTypes.find(d => d.id === 'parent') || DESIGN_TYPES[0]
+    const parentPreviewUrl = buildDesignPreviewUrl(parentDesignObj, {
+      width: parentRules.width || BASE_WIDTH,
+      height: parentRules.height || BASE_WIDTH
+    })
+
+    toast.loading('Generating child design…', { id: 'ai-child' })
+    const { base64, contentType } = await fetchImageAsBase64({ url: parentPreviewUrl })
+    const aiResponse = await createChildDesignWithAI({
+      endpointUrl,
+      adType,
+      parentRules,
+      parentImageBase64: base64,
+      parentImageMediaType: contentType
+    })
+
+    const { designType, designRules } = aiResponse || {}
+    if (!designType?.id || !designRules?.width || !designRules?.height) {
+      throw new Error('Lambda response missing designType/designRules')
+    }
+
+    const childId = designType.id
+    const childType = {
+      id: childId,
+      name: designType.name || adType,
+      width: designType.width || designRules.width,
+      height: designType.height || designRules.height,
+      description: designType.description || `AI generated: ${adType}`
+    }
+
+    const mergedChildRules = mergeRulesWithParent(parentRules, designRules)
+    const normalizedChildRules = normalizeRulesForTextDefaults(mergedChildRules)
+
+    setDesignTypes(prev => {
+      const exists = prev.some(d => d.id === childId)
+      if (exists) return prev.map(d => (d.id === childId ? { ...d, ...childType } : d))
+      return [...prev, childType]
+    })
+    setEditableRules(prev => ({
+      ...prev,
+      [childId]: normalizedChildRules
+    }))
+    defaultRulesRef.current = {
+      ...defaultRulesRef.current,
+      [childId]: normalizedChildRules
+    }
+
+    setPropertyOverrides(prev => {
+      const computed = computePropertyOverridesForChild({
+        childDesignId: childId,
+        parentRules,
+        childRules: normalizedChildRules,
+        inheritanceToggles
+      })
+      return { ...prev, ...computed }
+    })
+
+    setSelectedDesign(childType)
+    setCanvasDimensions({ width: normalizedChildRules.width, height: normalizedChildRules.height })
+    toast.success(`Created "${childType.name}"`, { id: 'ai-child', duration: 2000 })
+  }, [buildDesignPreviewUrl, designTypes, parentRules, inheritanceToggles, normalizeRulesForTextDefaults, mergeRulesWithParent])
+
   const getTransformedUrl = useCallback(() => {
     return buildDesignPreviewUrl(selectedDesign, canvasDimensions)
   }, [buildDesignPreviewUrl, selectedDesign, canvasDimensions])
@@ -474,7 +612,7 @@ function DesignPlayground() {
   const generatedUrl = getTransformedUrl()
 
   const reviewPreviews = useMemo(() => {
-    return DESIGN_TYPES.map(design => {
+    return designTypes.map(design => {
       const rules = getRulesForDesign(design.id)
       const width = rules.width || design.width || BASE_WIDTH
       const height = rules.height || design.height || BASE_WIDTH
@@ -486,7 +624,7 @@ function DesignPlayground() {
         height
       }
     })
-  }, [buildDesignPreviewUrl, getRulesForDesign])
+  }, [buildDesignPreviewUrl, getRulesForDesign, designTypes])
 
   useEffect(() => {
     if (!reviewPreviews.length) return
@@ -657,8 +795,9 @@ function DesignPlayground() {
     setModifiedLayers,
     setFormValues,
     inheritanceToggles,
-    isPropertyOverridden
-  }), [selectedDesign.id, layerMap, inheritanceToggles, propertyOverrides, isPropertyOverridden])
+    isPropertyOverridden,
+    getChildDesignIds: () => designTypes.filter(d => d.id !== 'parent').map(d => d.id)
+  }), [selectedDesign.id, layerMap, inheritanceToggles, propertyOverrides, isPropertyOverridden, designTypes])
 
   // Helper to get layer key from layer display name
   const getLayerKey = useCallback((layerName) => {
@@ -1023,7 +1162,7 @@ function DesignPlayground() {
       width: parentRule.width || BASE_WIDTH,
       height: parentRule.height || BASE_WIDTH
     })
-    setSelectedDesign(DESIGN_TYPES[0])
+    setSelectedDesign(designTypes.find(d => d.id === 'parent') || DESIGN_TYPES[0])
     setInheritanceToggles({
       inheritStyles: true,
       inheritAll: false
@@ -1086,7 +1225,7 @@ function DesignPlayground() {
     setDesignName('Shoes Ad Example')
     
     // Reset other states
-    setSelectedDesign(DESIGN_TYPES[0])
+    setSelectedDesign(designTypes.find(d => d.id === 'parent') || DESIGN_TYPES[0])
     setInheritanceToggles({
       inheritStyles: true,
       inheritAll: false
@@ -1133,8 +1272,10 @@ function DesignPlayground() {
   const designContext = {
     selectedAsset,
     setSelectedAsset,
+    designTypes,
     selectedDesign,
     setSelectedDesign,
+    openAICreateChildDesignModal: () => setIsAICreateChildModalOpen(true),
     canvasDimensions,
     setCanvasDimensions,
     inheritanceToggles,
@@ -1253,6 +1394,17 @@ function DesignPlayground() {
           />
         </>
       )}
+      <AICreateChildDesignModal
+        isOpen={isAICreateChildModalOpen}
+        onClose={() => setIsAICreateChildModalOpen(false)}
+        onCreate={async (adType) => {
+          try {
+            await handleCreateChildDesignWithAI(adType)
+          } catch (e) {
+            toast.error(e?.message || 'Failed to create child design', { id: 'ai-child' })
+          }
+        }}
+      />
     </div>
   )
 }

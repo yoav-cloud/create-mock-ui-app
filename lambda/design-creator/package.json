@@ -1,0 +1,11 @@
+{
+  "name": "design-creator-lambda",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.883.0"
+  }
+}
+
+
