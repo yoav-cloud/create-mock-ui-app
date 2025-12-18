@@ -1,5 +1,6 @@
 import React from 'react'
 import './FigmaImportModal.css'
+import FigmaFramePreview from './FigmaFramePreview'
 
 export default function FigmaConverterPanel({
   selectedFile,
@@ -22,6 +23,9 @@ export default function FigmaConverterPanel({
   isConverting,
   copySuccess,
   previewLayers = null,
+  framePreview = null,
+  showPreviewOverlays = false,
+  onTogglePreviewOverlays = () => {},
   templateName = '',
   onTemplateNameChange = () => {},
   layerSelections = {},
@@ -79,6 +83,31 @@ export default function FigmaConverterPanel({
           {(isConverting || isInspectingFile) && <div className="figma-inline-spinner" aria-hidden="true"></div>}
         </div>
       </div>
+
+      <div className="figma-preview-toolbar">
+        <label className="figma-preview-toggle">
+          <input
+            type="checkbox"
+            checked={Boolean(showPreviewOverlays)}
+            onChange={onTogglePreviewOverlays}
+          />
+          <span>Show layer overlays</span>
+        </label>
+      </div>
+
+      <FigmaFramePreview
+        title={mode === 'picker' ? 'Preview' : 'Preview (no Cloudinary upload yet)'}
+        frameName={selectedFrame ? `${selectedFrame.pageName ? `${selectedFrame.pageName} / ` : ''}${selectedFrame.name}` : ''}
+        imageUrl={framePreview?.imageUrl || ''}
+        isLoading={Boolean(framePreview?.isLoading)}
+        showOverlays={Boolean(showPreviewOverlays)}
+        frameWidth={framePreview?.frameWidth || 0}
+        frameHeight={framePreview?.frameHeight || 0}
+        layers={framePreview?.overlayLayers || []}
+        layerSelections={layerSelections}
+        mainProductLayerId={mainProductLayerId}
+        onToggleLayer={mode === 'details' && showPreviewOverlays ? onToggleLayerSelection : null}
+      />
 
       {mode === 'picker' && (
         <>

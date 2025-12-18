@@ -46,6 +46,18 @@ export const findNodeById = (node, id) => {
   return null
 }
 
+export const findNodePathById = (node, id, path = []) => {
+  if (!node) return null
+  const nextPath = [...path, node]
+  if (node.id === id) return nextPath
+  if (!node.children) return null
+  for (const child of node.children) {
+    const found = findNodePathById(child, id, nextPath)
+    if (found) return found
+  }
+  return null
+}
+
 export const extractTemplatedNodes = (node, acc = []) => {
   if (!node) return acc
   if (typeof node.name === 'string' && node.name.includes(TEMPLATE_MARKER)) {
@@ -95,6 +107,58 @@ export const getRelativeBox = (node, frame) => {
     width: Math.round(source.width ?? 0),
     height: Math.round(source.height ?? 0)
   }
+}
+
+export const buildLayerPreviewForFrame = ({ frameNode, templatedNodes = [] }) => {
+  const frameBox = frameNode?.absoluteBoundingBox || { width: 0, height: 0 }
+  const frameWidth = Math.round(frameBox.width ?? frameNode?.width ?? 0)
+  const frameHeight = Math.round(frameBox.height ?? frameNode?.height ?? 0)
+
+  const previewLayers = {
+    images: [],
+    texts: []
+  }
+
+  const overlayLayers = []
+
+  if (!frameNode || !Array.isArray(templatedNodes)) {
+    return { previewLayers, overlayLayers, frameWidth, frameHeight }
+  }
+
+  templatedNodes.forEach(node => {
+    const variable = extractVariableFromName(node?.name || '')
+    const box = getRelativeBox(node, frameNode)
+    const layerBase = {
+      id: node.id,
+      name: node.name,
+      type: node.type,
+      variable,
+      box
+    }
+
+    overlayLayers.push(layerBase)
+
+    if (node.type === 'TEXT') {
+      previewLayers.texts.push({
+        id: node.id,
+        name: node.name,
+        variable,
+        characters: (node.characters || '').trim()
+      })
+      return
+    }
+
+    previewLayers.images.push({
+      id: node.id,
+      name: node.name,
+      variable,
+      width: box.width || null,
+      height: box.height || null,
+      type: node.type
+    })
+  })
+
+  return { previewLayers, overlayLayers, frameWidth, frameHeight }
 }
 
 const buildTextLayer = (node, frame) => {

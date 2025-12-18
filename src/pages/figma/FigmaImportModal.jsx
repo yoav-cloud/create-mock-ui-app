@@ -6,9 +6,10 @@ import FigmaProjectSelector from './FigmaProjectSelector'
 import FigmaFileSelector from './FigmaFileSelector'
 import FigmaConverterPanel from './FigmaConverterPanel'
 import FigmaWizardSteps from './FigmaWizardSteps'
-import { fetchFigmaProfile, fetchTeamProjects, fetchProjectFiles, fetchFigmaFileDetails, fetchFigmaImagesForNodes } from './figmaApi'
+import { fetchFigmaProfile, fetchTeamProjects, fetchProjectFiles, fetchFigmaFileDetails, fetchFigmaFileDetailsForNodes, fetchFigmaImagesForNodes } from './figmaApi'
 import { uploadImageFromUrl } from './cloudinaryUploads'
-import { collectFramesFromDocument, extractTemplatedNodes, findNodeById, buildTransformationForFrame, extractVariableFromName, buildDesignRulesFromNodes, buildDesignRulesWithChildren } from './figmaConversionUtils'
+import { collectFramesFromDocument, extractTemplatedNodes, findNodeById, findNodePathById, buildTransformationForFrame, buildLayerPreviewForFrame, buildDesignRulesFromNodes, buildDesignRulesWithChildren } from './figmaConversionUtils'
+import { parseFigmaFileNodeUrl } from './figmaUrlUtils'
 
 const STEP = {
   CONNECT: 'connect',
@@ -55,6 +56,25 @@ const buildStateValue = () => {
     return `figma-${crypto.randomUUID()}`
   }
   return `figma-${Math.random().toString(36).slice(2)}`
+}
+
+const extractTeamIdFromInput = (value = '') => {
+  const raw = String(value || '').trim()
+  if (!raw) return ''
+
+  try {
+    const url = new URL(raw)
+    const path = url.pathname || ''
+    const match = path.match(/\/(?:files\/team|team)\/([^/]+)/i)
+    if (match?.[1]) return match[1]
+  } catch {
+    // Not a URL; fall through to regex parsing.
+  }
+
+  const fallbackMatch = raw.match(/(?:files\/team|team)\/([^/?#\s]+)/i)
+  if (fallbackMatch?.[1]) return fallbackMatch[1]
+
+  return raw
 }
 
 const isBrowser = typeof window !== 'undefined'
@@ -110,6 +130,11 @@ export default function FigmaImportModal({ isOpen, onClose, onTemplateImported =
   const [copySuccess, setCopySuccess] = useState('')
   const [conversionUploads, setConversionUploads] = useState([])
   const [previewLayers, setPreviewLayers] = useState(null)
+  const [framePreview, setFramePreview] = useState(null)
+  const [preflightFrameId, setPreflightFrameId] = useState('')
+  const [fileUrlInput, setFileUrlInput] = useState('')
+  const [isResolvingFileUrl, setIsResolvingFileUrl] = useState(false)
+  const [showPreviewOverlays, setShowPreviewOverlays] = useState(false)
   const [templateName, setTemplateName] = useState('')
   const [templateTouched, setTemplateTouched] = useState(false)
   const [layerSelections, setLayerSelections] = useState({})
@@ -231,6 +256,11 @@ useEffect(() => {
     setIsStepTransitioning(false)
     setIsImporting(false)
     setPreviewLayers(null)
+    setFramePreview(null)
+    setPreflightFrameId('')
+    setFileUrlInput('')
+    setIsResolvingFileUrl(false)
+    setShowPreviewOverlays(false)
     setTemplateName('')
     setTemplateTouched(false)
     setLayerSelections({})
@@ -253,7 +283,7 @@ useEffect(() => {
       setError('Missing Figma access token. Please connect again.')
       return
     }
-    const normalizedId = teamIdValue?.trim()
+    const normalizedId = extractTeamIdFromInput(teamIdValue)
     if (!normalizedId) {
       setError('Enter a valid team ID to continue.')
       return
@@ -265,6 +295,7 @@ useEffect(() => {
       const projects = await fetchTeamProjects(accessToken, normalizedId)
       setTeamProjects(projects)
       setActiveTeamId(normalizedId)
+      setTeamIdInput(normalizedId)
       setSelectedProjectId(null)
       setProjectFiles({})
       if (!projects.length) {
@@ -443,6 +474,10 @@ useEffect(() => {
     setConversionUploads([])
     setConversionStatus('')
     setPreviewLayers(null)
+    setFramePreview(null)
+    setPreflightFrameId('')
+    setFileUrlInput('')
+    setIsResolvingFileUrl(false)
     setLayerSelections({})
     setMainProductLayerId('')
     setTransformationOverride('')
@@ -483,6 +518,10 @@ useEffect(() => {
     setConversionUploads([])
     setConversionStatus('')
     setPreviewLayers(null)
+    setFramePreview(null)
+    setPreflightFrameId('')
+    setFileUrlInput('')
+    setIsResolvingFileUrl(false)
     setLayerSelections({})
     setMainProductLayerId('')
     setTransformationOverride('')
@@ -491,6 +530,10 @@ useEffect(() => {
   const handleBackToProjects = useCallback(() => {
     setStep(STEP.PROJECT)
     setPreviewLayers(null)
+    setFramePreview(null)
+    setPreflightFrameId('')
+    setFileUrlInput('')
+    setIsResolvingFileUrl(false)
     setTemplateName('')
     setTemplateTouched(false)
     setLayerSelections({})
@@ -511,10 +554,13 @@ useEffect(() => {
     setConversionUploads([])
     setConversionStatus('Loading frames…')
     setPreviewLayers(null)
+    setFramePreview(null)
+    setPreflightFrameId('')
     setLayerSelections({})
     setMainProductLayerId('')
     setTemplateTouched(false)
     setTransformationOverride('')
+    setFileUrlInput('')
     setSelectedFile({
       id: file.id,
       key: file.key || file.id,
@@ -568,6 +614,156 @@ useEffect(() => {
     }
   }, [accessToken, fetchFigmaFileDetails, templateTouched])
 
+  const handleOpenFromFileUrl = useCallback(async (rawUrl) => {
+    if (!accessToken) {
+      setError('Missing Figma access token. Please connect again.')
+      return
+    }
+
+    const { fileKey, nodeId } = parseFigmaFileNodeUrl(rawUrl)
+    if (!fileKey || !nodeId) {
+      setError('Paste a Figma URL that includes both a file key and a node-id.')
+      return
+    }
+
+    setIsResolvingFileUrl(true)
+    setError('')
+    setConversionResult(null)
+    setConversionUploads([])
+    setConversionStatus('Validating URL…')
+    setPreviewLayers(null)
+    setFramePreview(null)
+    setPreflightFrameId('')
+    setLayerSelections({})
+    setMainProductLayerId('')
+    setTransformationOverride('')
+
+    try {
+      const initialDetails = await fetchFigmaFileDetailsForNodes(accessToken, fileKey, [nodeId])
+      const initialRoot = initialDetails?.document?.document || initialDetails?.document
+      if (!initialRoot) {
+        setError('Unable to read the document for that file.')
+        return
+      }
+
+      const targetPath = findNodePathById(initialRoot, nodeId, [])
+      if (!targetPath?.length) {
+        setError('That node-id was not found in the file.')
+        return
+      }
+      const frameNode = [...targetPath].reverse().find(node => node?.type === 'FRAME')
+      if (!frameNode?.id) {
+        setError('That node is not inside a frame. Pick a frame node-id and try again.')
+        return
+      }
+      const pageNode = [...targetPath].reverse().find(node => node?.type === 'CANVAS')
+
+      const frameDetails = frameNode.id === nodeId
+        ? initialDetails
+        : await fetchFigmaFileDetailsForNodes(accessToken, fileKey, [frameNode.id])
+
+      setSelectedFile({
+        id: fileKey,
+        key: fileKey,
+        name: frameDetails?.name || 'Figma file',
+        lastModified: '—',
+        version: '—'
+      })
+      setFileDocument(frameDetails.document)
+
+      setFrameOptions([{
+        id: frameNode.id,
+        name: frameNode.name,
+        pageName: pageNode?.name || '',
+        node: frameNode
+      }])
+      setSelectedFrameId(frameNode.id)
+      if (!templateTouched) {
+        setTemplateName(formatTemplateNameFromFrame(frameNode.name))
+      }
+      setConversionStatus('Ready to import.')
+      setFileUrlInput(rawUrl)
+      setStep(STEP.DETAILS)
+    } catch (err) {
+      setError(err.message || 'Unable to open that Figma URL.')
+    } finally {
+      setIsResolvingFileUrl(false)
+    }
+  }, [accessToken, fetchFigmaFileDetailsForNodes, templateTouched])
+
+  useEffect(() => {
+    if (!isOpen) return
+    if (!(step === STEP.FRAMES || step === STEP.DETAILS)) return
+    if (!accessToken || !selectedFile?.key || !fileDocument || !selectedFrameId) return
+
+    const documentRoot = fileDocument.document || fileDocument
+    const frameNode = findNodeById(documentRoot, selectedFrameId)
+    if (!frameNode) return
+
+    const templatedNodes = extractTemplatedNodes(frameNode)
+    const { previewLayers: nextPreviewLayers, overlayLayers, frameWidth, frameHeight } =
+      buildLayerPreviewForFrame({ frameNode, templatedNodes })
+
+    setPreviewLayers(nextPreviewLayers)
+
+    if (!templatedNodes.length) {
+      setLayerSelections({})
+      setMainProductLayerId('')
+      setPreflightFrameId('')
+    } else if (preflightFrameId !== selectedFrameId) {
+      const selectionDefaults = {}
+      templatedNodes.forEach(node => {
+        selectionDefaults[node.id] = true
+      })
+      setLayerSelections(selectionDefaults)
+
+      const imageNodes = templatedNodes.filter(node => node.type !== 'TEXT')
+      const defaultMain =
+        imageNodes.find(node => {
+          const normalizedName = node.name ? node.name.toLowerCase() : ''
+          return normalizedName.startsWith('#main') || normalizedName.startsWith('#product')
+        })?.id || imageNodes[0]?.id || ''
+      setMainProductLayerId(defaultMain)
+      setPreflightFrameId(selectedFrameId)
+    }
+
+    let cancelled = false
+    setFramePreview({
+      imageUrl: '',
+      isLoading: true,
+      frameWidth,
+      frameHeight,
+      overlayLayers
+    })
+    ;(async () => {
+      try {
+        const imageMap = await fetchFigmaImagesForNodes(accessToken, selectedFile.key, [selectedFrameId])
+        const imageUrl = imageMap?.[selectedFrameId] || ''
+        if (cancelled) return
+        setFramePreview({
+          imageUrl,
+          isLoading: false,
+          frameWidth,
+          frameHeight,
+          overlayLayers
+        })
+      } catch {
+        if (cancelled) return
+        setFramePreview({
+          imageUrl: '',
+          isLoading: false,
+          frameWidth,
+          frameHeight,
+          overlayLayers
+        })
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [accessToken, fileDocument, isOpen, preflightFrameId, selectedFile?.key, selectedFrameId, step])
+
   const handleProceedToDetails = useCallback(() => {
     if (!selectedFile || !fileDocument) {
       setError('Select a file to continue.')
@@ -590,39 +786,6 @@ useEffect(() => {
     }
     const imageNodes = templatedNodes.filter(node => node.type !== 'TEXT')
     const textNodes = templatedNodes.filter(node => node.type === 'TEXT')
-    const nextPreview = {
-      images: imageNodes.map(node => {
-        const box = node.absoluteBoundingBox || {}
-        return {
-          id: node.id,
-          name: node.name,
-          variable: extractVariableFromName(node.name),
-          width: box.width ? Math.round(box.width) : null,
-          height: box.height ? Math.round(box.height) : null,
-          type: node.type
-        }
-      }),
-      texts: textNodes.map(node => {
-        return {
-          id: node.id,
-          name: node.name,
-          variable: extractVariableFromName(node.name),
-          characters: (node.characters || '').trim()
-        }
-      })
-    }
-    setPreviewLayers(nextPreview)
-    const selectionDefaults = {}
-    templatedNodes.forEach(node => {
-      selectionDefaults[node.id] = true
-    })
-    setLayerSelections(selectionDefaults)
-    const defaultMain =
-      imageNodes.find(node => {
-        const normalizedName = node.name ? node.name.toLowerCase() : ''
-        return normalizedName.startsWith('#main') || normalizedName.startsWith('#product')
-      })?.id || imageNodes[0]?.id || ''
-    setMainProductLayerId(defaultMain)
     setConversionResult(null)
     setConversionUploads([])
     const totalLayers = imageNodes.length + textNodes.length
@@ -880,6 +1043,7 @@ useEffect(() => {
   const canGoBack = useMemo(() => step !== STEP.CONNECT, [step])
 
   const canGoNext = useMemo(() => {
+    const markedLayerCount = (previewLayers?.images?.length || 0) + (previewLayers?.texts?.length || 0)
     switch (step) {
       case STEP.TEAM:
         return teamProjects.length > 0
@@ -888,11 +1052,11 @@ useEffect(() => {
       case STEP.FILE:
         return Boolean(selectedFile)
       case STEP.FRAMES:
-        return Boolean(selectedFrameId && !isInspectingFile)
+        return Boolean(selectedFrameId && !isInspectingFile && markedLayerCount > 0)
       default:
         return false
     }
-  }, [step, teamProjects.length, selectedProjectId, projectFiles, selectedFile, selectedFrameId, isInspectingFile])
+  }, [step, teamProjects.length, selectedProjectId, projectFiles, selectedFile, selectedFrameId, isInspectingFile, previewLayers])
 
   const nextLabel = step === STEP.FRAMES ? 'Review import' : 'Next'
 
@@ -1156,6 +1320,10 @@ useEffect(() => {
               files={currentProjectFiles || []}
               isLoading={isCurrentProjectLoading}
               onInspectFile={handleInspectFile}
+              fileUrlInput={fileUrlInput}
+              onFileUrlChange={setFileUrlInput}
+              onOpenFromUrl={handleOpenFromFileUrl}
+              isResolvingUrl={isResolvingFileUrl}
               onBack={handleBackToProjects}
             />
           )}
@@ -1176,6 +1344,8 @@ useEffect(() => {
                 setConversionStatus('')
                 setCopySuccess('')
                 setPreviewLayers(null)
+                setFramePreview(null)
+                setPreflightFrameId('')
                 setLayerSelections({})
                 setMainProductLayerId('')
                 if (!templateTouched) {
@@ -1195,6 +1365,9 @@ useEffect(() => {
               isConverting={isConverting}
               copySuccess={copySuccess}
               previewLayers={previewLayers}
+              framePreview={framePreview}
+              showPreviewOverlays={showPreviewOverlays}
+              onTogglePreviewOverlays={() => setShowPreviewOverlays(prev => !prev)}
               mode="picker"
             />
           )}
@@ -1229,6 +1402,9 @@ useEffect(() => {
               mainProductLayerId={mainProductLayerId}
               onSelectMainProduct={handleMainProductChange}
               previewLayers={previewLayers}
+              framePreview={framePreview}
+              showPreviewOverlays={showPreviewOverlays}
+              onTogglePreviewOverlays={() => setShowPreviewOverlays(prev => !prev)}
               mode="details"
             />
           )}

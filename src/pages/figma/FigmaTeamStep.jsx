@@ -19,12 +19,12 @@ export default function FigmaTeamStep({
         id="figma-team-id"
         className="figma-team-input"
         type="text"
-        placeholder="Enter your team ID"
+        placeholder="Enter a team ID or paste a team URL"
         value={teamIdInput}
         onChange={onTeamIdChange}
       />
       <p className="figma-team-help">
-        Copy the team ID from a URL like <code>https://www.figma.com/files/team/&lt;team_id&gt;</code>.
+        You can paste a URL like <code>https://www.figma.com/files/team/&lt;team_id&gt;</code> and we&apos;ll extract the ID.
       </p>
       <div className="figma-actions">
         <button type="submit" className="figma-primary-btn" disabled={isLoading}>

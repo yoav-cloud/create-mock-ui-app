@@ -54,6 +54,19 @@ export async function fetchFigmaFileDetails(token, fileKey) {
   return handleFigmaResponse(response, 'Unable to fetch file details.')
 }
 
+export async function fetchFigmaFileDetailsForNodes(token, fileKey, nodeIds = []) {
+  const url = new URL(`https://api.figma.com/v1/files/${fileKey}`)
+  if (nodeIds.length) {
+    url.searchParams.set('ids', nodeIds.join(','))
+  }
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  })
+  return handleFigmaResponse(response, 'Unable to fetch file details for that node.')
+}
+
 export async function fetchFigmaImagesForNodes(token, fileKey, nodeIds = []) {
   const images = {}
   const chunkSize = 40
