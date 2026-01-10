@@ -61,7 +61,8 @@ export default function PlaygroundDesignView() {
     highlightedField,
     expandedLayers,
     setExpandedLayers,
-    highlightedLayer
+    highlightedLayer,
+    yogaLayout
   } = design
 
   return (
@@ -81,6 +82,7 @@ export default function PlaygroundDesignView() {
         previewTab={previewTab}
         onTabChange={setPreviewTab}
         canvasDimensions={canvasDimensions}
+        yogaLayout={yogaLayout}
         previewWrapperRef={previewWrapperRef}
         imageLoading={imageLoading}
         imageError={imageError}

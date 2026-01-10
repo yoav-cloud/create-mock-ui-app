@@ -24,6 +24,9 @@ export default function FigmaConverterPanel({
   copySuccess,
   previewLayers = null,
   framePreview = null,
+  previewMode = 'dynamic',
+  onPreviewModeChange = () => {},
+  backgroundPreview = null,
   showPreviewOverlays = false,
   onTogglePreviewOverlays = () => {},
   templateName = '',
@@ -61,7 +64,11 @@ export default function FigmaConverterPanel({
     }, {})
   }, [conversionUploads])
   const isLayerChecked = (nodeId) => layerSelections[nodeId] !== false
-  const requiresMainProduct = Boolean(previewLayers?.images?.length)
+  const dynamicIdSet = React.useMemo(() => new Set(previewLayers?.dynamicIds || []), [previewLayers])
+  const isDynamicCandidate = (nodeId) => dynamicIdSet.has(nodeId)
+  const isDynamicOn = (nodeId) => isDynamicCandidate(nodeId) && isLayerChecked(nodeId)
+  const requiresMainProduct = Boolean((previewLayers?.images || []).some(layer => isDynamicOn(layer.id)))
+  const isBackgroundMode = previewMode === 'background'
 
   return (
     <div className="figma-converter-panel">
@@ -85,28 +92,61 @@ export default function FigmaConverterPanel({
       </div>
 
       <div className="figma-preview-toolbar">
-        <label className="figma-preview-toggle">
-          <input
-            type="checkbox"
-            checked={Boolean(showPreviewOverlays)}
-            onChange={onTogglePreviewOverlays}
-          />
-          <span>Show layer overlays</span>
-        </label>
+        {mode === 'details' && (
+          <fieldset className="figma-toggle" role="radiogroup" aria-label="Preview mode">
+            <label className={`figma-toggle__option ${previewMode === 'dynamic' ? 'is-active' : ''}`}>
+              <input
+                type="radio"
+                name="figma-preview-mode"
+                value="dynamic"
+                checked={previewMode === 'dynamic'}
+                onChange={() => onPreviewModeChange('dynamic')}
+              />
+              <span>Dynamic</span>
+            </label>
+            <label className={`figma-toggle__option ${previewMode === 'background' ? 'is-active' : ''}`}>
+              <input
+                type="radio"
+                name="figma-preview-mode"
+                value="background"
+                checked={previewMode === 'background'}
+                onChange={() => onPreviewModeChange('background')}
+              />
+              <span>Background</span>
+            </label>
+          </fieldset>
+        )}
+
+        {!isBackgroundMode && (
+          <label className="figma-switch">
+            <input
+              type="checkbox"
+              checked={Boolean(showPreviewOverlays)}
+              onChange={onTogglePreviewOverlays}
+            />
+            <span>Show layer overlays</span>
+          </label>
+        )}
       </div>
 
       <FigmaFramePreview
-        title={mode === 'picker' ? 'Preview' : 'Preview (no Cloudinary upload yet)'}
+        title={mode === 'picker' ? 'Preview' : (isBackgroundMode ? 'Background preview' : 'Preview (no Cloudinary upload yet)')}
         frameName={selectedFrame ? `${selectedFrame.pageName ? `${selectedFrame.pageName} / ` : ''}${selectedFrame.name}` : ''}
-        imageUrl={framePreview?.imageUrl || ''}
-        isLoading={Boolean(framePreview?.isLoading)}
-        showOverlays={Boolean(showPreviewOverlays)}
-        frameWidth={framePreview?.frameWidth || 0}
-        frameHeight={framePreview?.frameHeight || 0}
+        renderMode={isBackgroundMode ? 'background' : 'dynamic'}
+        imageUrl={isBackgroundMode ? '' : (framePreview?.imageUrl || '')}
+        isLoading={Boolean(isBackgroundMode ? backgroundPreview?.isLoading : framePreview?.isLoading)}
+        showOverlays={Boolean(!isBackgroundMode && showPreviewOverlays)}
+        backgroundPieces={isBackgroundMode ? (backgroundPreview?.pieces || []) : []}
+        backgroundColor={backgroundPreview?.backgroundColor || 'transparent'}
+        frameWidth={(isBackgroundMode ? backgroundPreview?.frameWidth : framePreview?.frameWidth) || 0}
+        frameHeight={(isBackgroundMode ? backgroundPreview?.frameHeight : framePreview?.frameHeight) || 0}
         layers={framePreview?.overlayLayers || []}
         layerSelections={layerSelections}
         mainProductLayerId={mainProductLayerId}
-        onToggleLayer={mode === 'details' && showPreviewOverlays ? onToggleLayerSelection : null}
+        onToggleLayer={mode === 'details' && !isBackgroundMode && showPreviewOverlays ? (nodeId) => {
+          if (!isDynamicCandidate(nodeId)) return
+          onToggleLayerSelection(nodeId)
+        } : null}
       />
 
       {mode === 'picker' && (
@@ -245,48 +285,64 @@ export default function FigmaConverterPanel({
         <div className="figma-preflight-section">
           <div className="figma-preview-group">
             <div className="figma-preview-header">
-              <p className="figma-files-eyebrow">Image layers to upload</p>
-              <span className="figma-preview-count">{previewLayers.images.length || 'None'}</span>
+              <p className="figma-files-eyebrow">
+                {isBackgroundMode ? 'Background images' : 'Dynamic images'}
+              </p>
+              <span className="figma-preview-count">
+                {isBackgroundMode
+                  ? (previewLayers.images.filter(layer => !isDynamicOn(layer.id)).length || 'None')
+                  : (previewLayers.images.filter(layer => isDynamicCandidate(layer.id)).length || 'None')}
+              </span>
             </div>
             {previewLayers.images.length ? (
               <table className="figma-preview-table">
                 <thead>
                   <tr>
-                    <th className="figma-preview-check-col">Import</th>
-                    <th className="figma-preview-main-col">Main product</th>
+                    {!isBackgroundMode && <th className="figma-preview-check-col">Dynamic</th>}
+                    {!isBackgroundMode && <th className="figma-preview-main-col">Main product</th>}
                     <th>Layer</th>
                     <th>Variable</th>
                     <th>Dimensions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {previewLayers.images.map(layer => (
+                  {previewLayers.images
+                    .filter(layer => (
+                      isBackgroundMode
+                        ? !isDynamicOn(layer.id)
+                        : isDynamicCandidate(layer.id)
+                    ))
+                    .map(layer => (
                     <tr
                       key={layer.id}
-                      className={`figma-preview-row ${isLayerChecked(layer.id) ? '' : 'is-disabled'}`}
+                      className={`figma-preview-row ${!isBackgroundMode && !isDynamicOn(layer.id) ? 'is-disabled' : ''}`}
                     >
-                      <td className="figma-preview-check-col">
-                        <label className="figma-layer-checkbox">
-                          <input
-                            type="checkbox"
-                            checked={isLayerChecked(layer.id)}
-                            onChange={() => onToggleLayerSelection(layer.id)}
-                            disabled={isConverting || mainProductLayerId === layer.id}
-                          />
-                        </label>
-                      </td>
-                      <td className="figma-preview-main-col">
-                        <label className={`figma-layer-radio ${!isLayerChecked(layer.id) ? 'disabled' : ''}`}>
-                          <input
-                            type="radio"
-                            name="figma-main-product"
-                            value={layer.id}
-                            checked={mainProductLayerId === layer.id}
-                            onChange={() => onSelectMainProduct(layer.id)}
-                            disabled={!isLayerChecked(layer.id) || isConverting}
-                          />
-                        </label>
-                      </td>
+                      {!isBackgroundMode && (
+                        <td className="figma-preview-check-col">
+                          <label className="figma-layer-checkbox">
+                            <input
+                              type="checkbox"
+                              checked={isDynamicOn(layer.id)}
+                              onChange={() => onToggleLayerSelection(layer.id)}
+                              disabled={isConverting || mainProductLayerId === layer.id}
+                            />
+                          </label>
+                        </td>
+                      )}
+                      {!isBackgroundMode && (
+                        <td className="figma-preview-main-col">
+                          <label className={`figma-layer-radio ${!isDynamicOn(layer.id) ? 'disabled' : ''}`}>
+                            <input
+                              type="radio"
+                              name="figma-main-product"
+                              value={layer.id}
+                              checked={mainProductLayerId === layer.id}
+                              onChange={() => onSelectMainProduct(layer.id)}
+                              disabled={!isDynamicOn(layer.id) || isConverting}
+                            />
+                          </label>
+                        </td>
+                      )}
                       <td>{layer.name}</td>
                       <td>{layer.variable ? `$${layer.variable}` : 'Static'}</td>
                       <td>{layer.width && layer.height ? `${layer.width}×${layer.height}` : 'Auto'}</td>
@@ -296,10 +352,10 @@ export default function FigmaConverterPanel({
               </table>
             ) : (
               <p className="figma-empty-state figma-empty-state--muted">
-                No image layers were flagged with the # marker.
+                No image layers found in this frame.
               </p>
             )}
-            {requiresMainProduct && (
+            {!isBackgroundMode && requiresMainProduct && (
               <p className="figma-main-product-hint">
                 Select the image that should respond to the asset switcher. The others will always use their uploaded assets.
               </p>
@@ -308,35 +364,49 @@ export default function FigmaConverterPanel({
 
           <div className="figma-preview-group">
             <div className="figma-preview-header">
-              <p className="figma-files-eyebrow">Text layers</p>
-              <span className="figma-preview-count">{previewLayers.texts.length || 'None'}</span>
+              <p className="figma-files-eyebrow">
+                {isBackgroundMode ? 'Background texts' : 'Dynamic texts'}
+              </p>
+              <span className="figma-preview-count">
+                {isBackgroundMode
+                  ? (previewLayers.texts.filter(layer => !isDynamicOn(layer.id)).length || 'None')
+                  : (previewLayers.texts.filter(layer => isDynamicCandidate(layer.id)).length || 'None')}
+              </span>
             </div>
             {previewLayers.texts.length ? (
               <table className="figma-preview-table">
                 <thead>
                   <tr>
-                    <th className="figma-preview-check-col">Import</th>
+                    {!isBackgroundMode && <th className="figma-preview-check-col">Dynamic</th>}
                     <th>Layer</th>
                     <th>Variable</th>
                     <th>Content</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {previewLayers.texts.map(layer => (
+                  {previewLayers.texts
+                    .filter(layer => (
+                      isBackgroundMode
+                        ? !isDynamicOn(layer.id)
+                        : isDynamicCandidate(layer.id)
+                    ))
+                    .map(layer => (
                     <tr
                       key={layer.id}
-                      className={`figma-preview-row ${isLayerChecked(layer.id) ? '' : 'is-disabled'}`}
+                      className={`figma-preview-row ${!isBackgroundMode && !isDynamicOn(layer.id) ? 'is-disabled' : ''}`}
                     >
-                      <td className="figma-preview-check-col">
-                        <label className="figma-layer-checkbox">
-                          <input
-                            type="checkbox"
-                            checked={isLayerChecked(layer.id)}
-                            onChange={() => onToggleLayerSelection(layer.id)}
-                            disabled={isConverting}
-                          />
-                        </label>
-                      </td>
+                      {!isBackgroundMode && (
+                        <td className="figma-preview-check-col">
+                          <label className="figma-layer-checkbox">
+                            <input
+                              type="checkbox"
+                              checked={isDynamicOn(layer.id)}
+                              onChange={() => onToggleLayerSelection(layer.id)}
+                              disabled={isConverting}
+                            />
+                          </label>
+                        </td>
+                      )}
                       <td>{layer.name}</td>
                       <td>{layer.variable ? `$${layer.variable}` : 'Static'}</td>
                       <td>{layer.characters ? layer.characters.slice(0, 80) + (layer.characters.length > 80 ? '…' : '') : 'Variable placeholder'}</td>
@@ -346,7 +416,7 @@ export default function FigmaConverterPanel({
               </table>
             ) : (
               <p className="figma-empty-state figma-empty-state--muted">
-                No text layers were flagged with the # marker.
+                No text layers found in this frame.
               </p>
             )}
           </div>

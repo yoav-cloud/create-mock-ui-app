@@ -2,6 +2,7 @@ import React from 'react'
 import './Preview.css'
 import LayerIndicators from './LayerIndicators'
 import TextualPreview from './TextualPreview'
+import { YogaPreview } from '../../yoga/components'
 
 export default function Preview({
   previewTab,
@@ -35,7 +36,8 @@ export default function Preview({
   getGravityOptions,
   getFontOptions,
   handleFontSizeValidation,
-  hoveredLayerFromPanel
+  hoveredLayerFromPanel,
+  yogaLayout
 }) {
   return (
     <div className="preview-area">
@@ -54,9 +56,16 @@ export default function Preview({
         >
           Rules
         </button>
+        <button
+          type="button"
+          className={`preview-tab ${previewTab === 'yoga' ? 'active' : ''}`}
+          onClick={() => onTabChange('yoga')}
+        >
+          Yoga
+        </button>
       </div>
 
-      {previewTab === 'visual' ? (
+      {previewTab === 'visual' && (
         <div
           className="preview-wrapper"
           ref={previewWrapperRef}
@@ -104,7 +113,9 @@ export default function Preview({
             hoveredLayerFromPanel={hoveredLayerFromPanel}
           />
         </div>
-      ) : (
+      )}
+
+      {previewTab === 'textual' && (
         <div className="textual-preview">
           <TextualPreview
             generatedUrl={generatedUrl}
@@ -125,6 +136,15 @@ export default function Preview({
             getGravityOptions={getGravityOptions}
             getFontOptions={getFontOptions}
             handleFontSizeValidation={handleFontSizeValidation}
+          />
+        </div>
+      )}
+
+      {previewTab === 'yoga' && (
+        <div className="yoga-preview-wrapper">
+          <YogaPreview 
+            yogaLayout={yogaLayout?.currentDesignYogaLayout}
+            designId={selectedDesign?.id || 'unknown'}
           />
         </div>
       )}

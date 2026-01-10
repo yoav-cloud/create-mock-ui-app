@@ -7,9 +7,10 @@ import FigmaFileSelector from './FigmaFileSelector'
 import FigmaConverterPanel from './FigmaConverterPanel'
 import FigmaWizardSteps from './FigmaWizardSteps'
 import { fetchFigmaProfile, fetchTeamProjects, fetchProjectFiles, fetchFigmaFileDetails, fetchFigmaFileDetailsForNodes, fetchFigmaImagesForNodes } from './figmaApi'
-import { uploadImageFromUrl } from './cloudinaryUploads'
-import { collectFramesFromDocument, extractTemplatedNodes, findNodeById, findNodePathById, buildTransformationForFrame, buildLayerPreviewForFrame, buildDesignRulesFromNodes, buildDesignRulesWithChildren } from './figmaConversionUtils'
+import { uploadImageBlob, uploadImageFromUrl } from './cloudinaryUploads'
+import { collectFramesFromDocument, extractTemplatedNodes, collectRenderableNodesForFrame, findNodeById, findNodePathById, buildTransformationForFrame, buildLayerPreviewForFrame, buildDesignRulesFromNodes, buildDesignRulesWithChildren, colorToHex } from './figmaConversionUtils'
 import { parseFigmaFileNodeUrl } from './figmaUrlUtils'
+import { composeBackgroundPngBlob, resizeImageBlobMaxDimension } from './imageBlobUtils'
 
 const STEP = {
   CONNECT: 'connect',
@@ -32,6 +33,16 @@ const WIZARD_STEPS = [
 
 const sanitizeFolderSegment = (value = '') => {
   return value
+    .trim()
+    .replace(/\s+/g, '_')
+    .replace(/[^a-zA-Z0-9_-]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/-+/g, '-')
+    .replace(/^[_-]+|[_-]+$/g, '')
+}
+
+const sanitizePublicIdSegment = (value = '') => {
+  return String(value || '')
     .trim()
     .replace(/\s+/g, '_')
     .replace(/[^a-zA-Z0-9_-]/g, '_')
@@ -135,6 +146,8 @@ export default function FigmaImportModal({ isOpen, onClose, onTemplateImported =
   const [fileUrlInput, setFileUrlInput] = useState('')
   const [isResolvingFileUrl, setIsResolvingFileUrl] = useState(false)
   const [showPreviewOverlays, setShowPreviewOverlays] = useState(false)
+  const [previewMode, setPreviewMode] = useState('dynamic')
+  const [backgroundPreview, setBackgroundPreview] = useState(null)
   const [templateName, setTemplateName] = useState('')
   const [templateTouched, setTemplateTouched] = useState(false)
   const [layerSelections, setLayerSelections] = useState({})
@@ -261,6 +274,8 @@ useEffect(() => {
     setFileUrlInput('')
     setIsResolvingFileUrl(false)
     setShowPreviewOverlays(false)
+    setPreviewMode('dynamic')
+    setBackgroundPreview(null)
     setTemplateName('')
     setTemplateTouched(false)
     setLayerSelections({})
@@ -700,24 +715,26 @@ useEffect(() => {
     const frameNode = findNodeById(documentRoot, selectedFrameId)
     if (!frameNode) return
 
-    const templatedNodes = extractTemplatedNodes(frameNode)
+    const renderableNodes = collectRenderableNodesForFrame(frameNode)
     const { previewLayers: nextPreviewLayers, overlayLayers, frameWidth, frameHeight } =
-      buildLayerPreviewForFrame({ frameNode, templatedNodes })
+      buildLayerPreviewForFrame({ frameNode, templatedNodes: renderableNodes })
 
     setPreviewLayers(nextPreviewLayers)
 
-    if (!templatedNodes.length) {
+    if (!renderableNodes.length) {
       setLayerSelections({})
       setMainProductLayerId('')
       setPreflightFrameId('')
     } else if (preflightFrameId !== selectedFrameId) {
       const selectionDefaults = {}
-      templatedNodes.forEach(node => {
-        selectionDefaults[node.id] = true
+      renderableNodes.forEach(node => {
+        if (typeof node?.name === 'string' && node.name.includes('#')) {
+          selectionDefaults[node.id] = true
+        }
       })
       setLayerSelections(selectionDefaults)
 
-      const imageNodes = templatedNodes.filter(node => node.type !== 'TEXT')
+      const imageNodes = renderableNodes.filter(node => node.type !== 'TEXT' && typeof node?.name === 'string' && node.name.includes('#'))
       const defaultMain =
         imageNodes.find(node => {
           const normalizedName = node.name ? node.name.toLowerCase() : ''
@@ -764,6 +781,75 @@ useEffect(() => {
     }
   }, [accessToken, fileDocument, isOpen, preflightFrameId, selectedFile?.key, selectedFrameId, step])
 
+  useEffect(() => {
+    if (!isOpen) return
+    if (step !== STEP.DETAILS) return
+    if (previewMode !== 'background') return
+    if (!accessToken || !selectedFile?.key || !fileDocument || !selectedFrameId) return
+    if (!framePreview?.overlayLayers?.length || !previewLayers) return
+
+    const documentRoot = fileDocument.document || fileDocument
+    const frameNode = findNodeById(documentRoot, selectedFrameId)
+    if (!frameNode) return
+
+    const dynamicIds = new Set(previewLayers.dynamicIds || [])
+    const backgroundLayerIds = framePreview.overlayLayers
+      .filter(layer => {
+        const isCandidate = dynamicIds.has(layer.id)
+        const isDynamicOn = isCandidate && layerSelections[layer.id] !== false
+        return !isDynamicOn
+      })
+      .map(layer => layer.id)
+
+    const fill = frameNode?.fills?.find(f => f.type === 'SOLID' && f.visible !== false)
+    const bgHex = fill ? `#${colorToHex(fill.color, fill.opacity ?? 1)}` : 'transparent'
+
+    let cancelled = false
+    setBackgroundPreview({
+      isLoading: true,
+      frameWidth: framePreview.frameWidth,
+      frameHeight: framePreview.frameHeight,
+      backgroundColor: bgHex,
+      pieces: []
+    })
+
+    ;(async () => {
+      try {
+        const imageMap = await fetchFigmaImagesForNodes(accessToken, selectedFile.key, backgroundLayerIds)
+        if (cancelled) return
+        const pieces = framePreview.overlayLayers
+          .filter(layer => backgroundLayerIds.includes(layer.id))
+          .map(layer => ({
+            id: layer.id,
+            imageUrl: imageMap?.[layer.id] || '',
+            box: layer.box
+          }))
+          .filter(piece => Boolean(piece.imageUrl))
+
+        setBackgroundPreview({
+          isLoading: false,
+          frameWidth: framePreview.frameWidth,
+          frameHeight: framePreview.frameHeight,
+          backgroundColor: bgHex,
+          pieces
+        })
+      } catch {
+        if (cancelled) return
+        setBackgroundPreview({
+          isLoading: false,
+          frameWidth: framePreview.frameWidth,
+          frameHeight: framePreview.frameHeight,
+          backgroundColor: bgHex,
+          pieces: []
+        })
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [accessToken, fileDocument, framePreview, isOpen, layerSelections, previewLayers, previewMode, selectedFile?.key, selectedFrameId, step])
+
   const handleProceedToDetails = useCallback(() => {
     if (!selectedFile || !fileDocument) {
       setError('Select a file to continue.')
@@ -779,13 +865,9 @@ useEffect(() => {
       setError('Frame not found in the selected file.')
       return
     }
-    const templatedNodes = extractTemplatedNodes(frameNode)
-    if (!templatedNodes.length) {
-      setError('No layers in this frame use the # export marker. Rename nodes like "Title #headline" and try again.')
-      return
-    }
-    const imageNodes = templatedNodes.filter(node => node.type !== 'TEXT')
-    const textNodes = templatedNodes.filter(node => node.type === 'TEXT')
+    const renderableNodes = collectRenderableNodesForFrame(frameNode)
+    const imageNodes = renderableNodes.filter(node => node.type !== 'TEXT')
+    const textNodes = renderableNodes.filter(node => node.type === 'TEXT')
     setConversionResult(null)
     setConversionUploads([])
     const totalLayers = imageNodes.length + textNodes.length
@@ -829,17 +911,10 @@ useEffect(() => {
       setError('Frame not found in the selected file.')
       return
     }
-    const templatedNodes = extractTemplatedNodes(frameNode)
-    if (!templatedNodes.length) {
-      setError('No layers in this frame use the # export marker. Rename nodes like "Title #headline" and try again.')
-      return
-    }
-    const selectedNodes = templatedNodes.filter(node => layerSelections[node.id] !== false)
-    if (!selectedNodes.length) {
-      setError('Select at least one layer to import.')
-      return
-    }
-    const requiresMainProduct = selectedNodes.some(node => node.type !== 'TEXT')
+    const renderableNodes = collectRenderableNodesForFrame(frameNode)
+    const dynamicCandidateNodes = renderableNodes.filter(node => typeof node?.name === 'string' && node.name.includes('#'))
+    const dynamicSelectedNodes = dynamicCandidateNodes.filter(node => layerSelections[node.id] !== false)
+    const requiresMainProduct = dynamicSelectedNodes.some(node => node.type !== 'TEXT')
     if (requiresMainProduct && (!mainProductLayerId || layerSelections[mainProductLayerId] === false)) {
       setError('Choose a main product image to continue.')
       return
@@ -853,35 +928,98 @@ useEffect(() => {
     setCopySuccess('')
 
     try {
-      const imageNodes = selectedNodes.filter(node => node.type !== 'TEXT')
-      const textNodes = selectedNodes.filter(node => node.type === 'TEXT')
+      const timestampSuffix = Date.now()
+      const frameBox = frameNode.absoluteBoundingBox || { width: frameNode.width, height: frameNode.height }
+      const frameWidth = Math.round(frameBox?.width || frameNode.width || 1)
+      const frameHeight = Math.round(frameBox?.height || frameNode.height || 1)
+
+      const dynamicOnIds = new Set(dynamicSelectedNodes.map(node => node.id))
+      const backgroundNodes = renderableNodes.filter(node => !dynamicOnIds.has(node.id))
+      const dynamicImageNodes = dynamicSelectedNodes.filter(node => node.type !== 'TEXT')
+      const dynamicTextNodes = dynamicSelectedNodes.filter(node => node.type === 'TEXT')
+
+      // Upload 1 flattened background image (includes non-# + dynamic-off layers, including text nodes)
+      setConversionStatus('Preparing background…')
+      const backgroundLayerIds = backgroundNodes.map(node => node.id)
+      const backgroundPiecesMap = backgroundLayerIds.length
+        ? await fetchFigmaImagesForNodes(accessToken, selectedFile.key, backgroundLayerIds)
+        : {}
+
+      const fill = frameNode?.fills?.find(f => f.type === 'SOLID' && f.visible !== false)
+      const bgHex = fill ? `#${colorToHex(fill.color, fill.opacity ?? 1)}` : 'transparent'
+      const pieces = (framePreview?.overlayLayers || [])
+        .filter(layer => backgroundLayerIds.includes(layer.id))
+        .map(layer => ({
+          id: layer.id,
+          imageUrl: backgroundPiecesMap[layer.id] || '',
+          box: layer.box
+        }))
+        .filter(piece => Boolean(piece.imageUrl))
+
+      const backgroundBlob = await composeBackgroundPngBlob({
+        frameWidth,
+        frameHeight,
+        backgroundColor: bgHex,
+        pieces,
+        maxDim: 2000
+      })
+      if (!backgroundBlob) {
+        throw new Error('Failed to build background image.')
+      }
+
+      const backgroundPublicId = sanitizePublicIdSegment(`${frameNode.name || 'frame'}_background`) || 'background'
+      const backgroundUpload = await uploadImageBlob({
+        blob: backgroundBlob,
+        filename: `${backgroundPublicId}.png`,
+        publicId: `${backgroundPublicId}-${timestampSuffix}`,
+        config: { ...cloudinaryConfig, folder: uploadFolder }
+      })
+
+      const uploads = [
+        { nodeId: 'background', publicId: backgroundUpload.publicId, secureUrl: backgroundUpload.secureUrl }
+      ]
+
+      // Upload dynamic image layers only
+      setConversionStatus('Uploading dynamic assets to Cloudinary…')
       let assetsMap = {}
-      if (imageNodes.length) {
-        const imageMap = await fetchFigmaImagesForNodes(accessToken, selectedFile.key, imageNodes.map(node => node.id))
-        setConversionStatus('Uploading assets to Cloudinary…')
-        const uploads = []
-        for (const node of imageNodes) {
-          const imageUrl = imageMap[node.id]
+      if (dynamicImageNodes.length) {
+        const dynamicImageMap = await fetchFigmaImagesForNodes(accessToken, selectedFile.key, dynamicImageNodes.map(node => node.id))
+        for (const node of dynamicImageNodes) {
+          const imageUrl = dynamicImageMap[node.id]
           if (!imageUrl) {
             uploads.push({ nodeId: node.id, error: 'Preview not available' })
             continue
           }
-          const upload = await uploadImageFromUrl({
-            imageUrl,
-            fallbackName: node.name || node.id,
+          const res = await fetch(imageUrl)
+          if (!res.ok) {
+            uploads.push({ nodeId: node.id, error: 'Preview not available' })
+            continue
+          }
+          const rawBlob = await res.blob()
+          const resizedBlob = await resizeImageBlobMaxDimension(rawBlob, 2000)
+          const cleanName = sanitizePublicIdSegment(node.name || node.id) || `layer_${node.id}`
+          const upload = await uploadImageBlob({
+            blob: resizedBlob,
+            filename: `${cleanName}.png`,
+            publicId: `${cleanName}-${timestampSuffix}`,
             config: { ...cloudinaryConfig, folder: uploadFolder }
           })
           assetsMap[node.id] = upload
           uploads.push({ nodeId: node.id, publicId: upload.publicId, secureUrl: upload.secureUrl })
         }
-        setConversionUploads(uploads)
       }
+
+      setConversionUploads(uploads)
+
       setConversionStatus('Building transformation…')
+      const dynamicNodeIds = new Set(dynamicSelectedNodes.map(node => node.id))
       const conversion = buildTransformationForFrame({
         frameNode,
-        textNodes,
-        imageNodes,
-        assetsMap
+        textNodes: dynamicTextNodes,
+        imageNodes: dynamicImageNodes,
+        assetsMap,
+        dynamicNodeIds,
+        backgroundAssetPublicId: backgroundUpload.publicId
       })
       const userOverride = transformationOverride?.trim()
       const finalTransformation = userOverride || conversion.transformation
@@ -898,8 +1036,9 @@ useEffect(() => {
         // eslint-disable-next-line no-console
         console.log('[Figma] Frame details', {
           frame: frameNode,
-          textNodes,
-          imageNodes,
+          dynamicTextNodes,
+          dynamicImageNodes,
+          backgroundLayerCount: backgroundNodes.length,
           transformation: conversion.transformation,
           layers: conversion.layers
         })
@@ -907,11 +1046,33 @@ useEffect(() => {
       setConversionStatus('Importing to Playground…')
       const designRulesResult = buildDesignRulesFromNodes({
         frameNode,
-        nodes: selectedNodes,
+        nodes: dynamicSelectedNodes,
         assetsMap,
         mainProductLayerId: requiresMainProduct ? mainProductLayerId : null
       })
-      const allDesignRules = buildDesignRulesWithChildren(designRulesResult.rules)
+      const parentWithBackground = (() => {
+        const rules = designRulesResult.rules || {}
+        return {
+          width: rules.width,
+          height: rules.height,
+          backgroundColor: rules.backgroundColor,
+          backgroundImage: {
+            width: rules.width,
+            height: rules.height,
+            x: 0,
+            y: 0,
+            gravity: 'north_west',
+            publicId: backgroundUpload.publicId,
+            displayName: 'Background'
+          },
+          ...Object.keys(rules).reduce((acc, key) => {
+            if (key === 'width' || key === 'height' || key === 'backgroundColor') return acc
+            acc[key] = rules[key]
+            return acc
+          }, {})
+        }
+      })()
+      const allDesignRules = buildDesignRulesWithChildren(parentWithBackground)
       if (import.meta.env.DEV) {
         // eslint-disable-next-line no-console
         console.log('[Figma] Imported Design Rules (Full JSON):', JSON.stringify(allDesignRules, null, 2))
@@ -954,17 +1115,22 @@ useEffect(() => {
     const frameNode = findNodeById(documentRoot, selectedFrameId)
     if (!frameNode) return ''
 
-    const templatedNodes = extractTemplatedNodes(frameNode)
-    const selectedNodes = templatedNodes.filter(node => layerSelections[node.id] !== false)
+    const renderableNodes = collectRenderableNodesForFrame(frameNode)
+    if (!renderableNodes.length) return ''
 
-    if (!selectedNodes.length) return ''
-
-    const textNodes = selectedNodes.filter(node => node.type === 'TEXT')
-    const imageNodes = selectedNodes.filter(node => node.type !== 'TEXT')
+    const dynamicNodeIds = new Set(
+      renderableNodes
+        .filter(node => typeof node?.name === 'string' && node.name.includes('#') && layerSelections[node.id] !== false)
+        .map(node => node.id)
+    )
+    const dynamicNodes = renderableNodes.filter(node => dynamicNodeIds.has(node.id))
+    const textNodes = dynamicNodes.filter(node => node.type === 'TEXT')
+    const imageNodes = dynamicNodes.filter(node => node.type !== 'TEXT')
 
     const templateSlug = sanitizeFolderSegment(templateName)
     const baseFolder = cloudinaryConfig.folder || 'figma-exports'
     const uploadFolder = buildFolderPath(baseFolder, templateSlug)
+    const mockBackgroundPublicId = `${uploadFolder}/${sanitizePublicIdSegment(`${frameNode.name || 'frame'}_background`) || 'background'}`
 
     const mockAssetsMap = {}
     imageNodes.forEach(node => {
@@ -979,7 +1145,9 @@ useEffect(() => {
       frameNode,
       textNodes,
       imageNodes,
-      assetsMap: mockAssetsMap
+      assetsMap: mockAssetsMap,
+      dynamicNodeIds,
+      backgroundAssetPublicId: mockBackgroundPublicId
     })
 
     return conversion.transformation
@@ -997,9 +1165,12 @@ useEffect(() => {
     setConversionStatus('Pick another frame to inspect.')
     setCopySuccess('')
     setPreviewLayers(null)
+    setFramePreview(null)
     setLayerSelections({})
     setMainProductLayerId('')
     setTransformationOverride('')
+    setPreviewMode('dynamic')
+    setBackgroundPreview(null)
     setStep(STEP.FRAMES)
   }, [])
 
@@ -1043,7 +1214,6 @@ useEffect(() => {
   const canGoBack = useMemo(() => step !== STEP.CONNECT, [step])
 
   const canGoNext = useMemo(() => {
-    const markedLayerCount = (previewLayers?.images?.length || 0) + (previewLayers?.texts?.length || 0)
     switch (step) {
       case STEP.TEAM:
         return teamProjects.length > 0
@@ -1052,25 +1222,20 @@ useEffect(() => {
       case STEP.FILE:
         return Boolean(selectedFile)
       case STEP.FRAMES:
-        return Boolean(selectedFrameId && !isInspectingFile && markedLayerCount > 0)
+        return Boolean(selectedFrameId && !isInspectingFile)
       default:
         return false
     }
-  }, [step, teamProjects.length, selectedProjectId, projectFiles, selectedFile, selectedFrameId, isInspectingFile, previewLayers])
+  }, [step, teamProjects.length, selectedProjectId, projectFiles, selectedFile, selectedFrameId, isInspectingFile])
 
   const nextLabel = step === STEP.FRAMES ? 'Review import' : 'Next'
 
-  const selectedLayerCount = useMemo(() => {
-    if (!previewLayers) return 0
-    const allIds = [
-      ...(previewLayers.images || []).map(layer => layer.id),
-      ...(previewLayers.texts || []).map(layer => layer.id)
-    ]
-    if (!allIds.length) return 0
-    return allIds.filter(id => layerSelections[id] !== false).length
-  }, [layerSelections, previewLayers])
-
-  const requiresMainProductSelection = Boolean(previewLayers?.images?.length)
+  const requiresMainProductSelection = Boolean(
+    (previewLayers?.images || []).some(layer => {
+      const isDynamicCandidate = (previewLayers?.dynamicIds || []).includes(layer.id)
+      return isDynamicCandidate && layerSelections[layer.id] !== false
+    })
+  )
   const hasMainProductSelection = !requiresMainProductSelection || (
     mainProductLayerId && layerSelections[mainProductLayerId] !== false
   )
@@ -1146,9 +1311,12 @@ useEffect(() => {
       const nextValue = prev[nodeId] === false
       const nextState = { ...prev, [nodeId]: nextValue }
       if (!nextValue && nodeId === mainProductLayerId) {
-        const fallbackImage = previewLayers?.images?.find(
-          image => image.id !== nodeId && nextState[image.id] !== false
-        )
+        const dynamicIds = new Set(previewLayers?.dynamicIds || [])
+        const fallbackImage = previewLayers?.images?.find(image => {
+          if (!dynamicIds.has(image.id)) return false
+          if (image.id === nodeId) return false
+          return nextState[image.id] !== false
+        })
         setMainProductLayerId(fallbackImage ? fallbackImage.id : '')
       }
       return nextState
@@ -1156,6 +1324,8 @@ useEffect(() => {
   }, [mainProductLayerId, previewLayers])
 
   const handleMainProductChange = useCallback((nodeId) => {
+    const dynamicIds = new Set(previewLayers?.dynamicIds || [])
+    if (!dynamicIds.has(nodeId)) return
     if (!previewLayers?.images?.some(image => image.id === nodeId)) return
     setLayerSelections(prev => ({
       ...prev,
@@ -1209,7 +1379,7 @@ useEffect(() => {
   const footerPrimaryLabel =
     step === STEP.DETAILS ? (isConverting ? 'Creating…' : 'Create Design') : nextLabel
   const footerPrimaryDisabled = step === STEP.DETAILS
-    ? (isConverting || !isTemplateReady || !selectedLayerCount || !hasMainProductSelection)
+    ? (isConverting || !isTemplateReady || !hasMainProductSelection)
     : !canGoNext
   const footerPrimaryAction = step === STEP.DETAILS ? handleRunConversion : handleNextStep
 
@@ -1366,6 +1536,9 @@ useEffect(() => {
               copySuccess={copySuccess}
               previewLayers={previewLayers}
               framePreview={framePreview}
+              previewMode="dynamic"
+              onPreviewModeChange={() => {}}
+              backgroundPreview={null}
               showPreviewOverlays={showPreviewOverlays}
               onTogglePreviewOverlays={() => setShowPreviewOverlays(prev => !prev)}
               mode="picker"
@@ -1403,6 +1576,14 @@ useEffect(() => {
               onSelectMainProduct={handleMainProductChange}
               previewLayers={previewLayers}
               framePreview={framePreview}
+              previewMode={previewMode}
+              onPreviewModeChange={(nextMode) => {
+                setPreviewMode(nextMode)
+                if (nextMode !== 'dynamic') {
+                  setShowPreviewOverlays(false)
+                }
+              }}
+              backgroundPreview={backgroundPreview}
               showPreviewOverlays={showPreviewOverlays}
               onTogglePreviewOverlays={() => setShowPreviewOverlays(prev => !prev)}
               mode="details"

@@ -592,9 +592,46 @@
 .figma-preview-toolbar {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
 }
 
-.figma-preview-toggle {
+.figma-toggle {
+  display: inline-flex;
+  border: 1px solid var(--figma-border);
+  border-radius: 999px;
+  overflow: hidden;
+  padding: 2px;
+  background: rgba(255, 255, 255, 0.03);
+  gap: 2px;
+}
+
+.figma-toggle__option {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  cursor: pointer;
+  color: var(--figma-muted);
+  font-size: 0.9rem;
+  user-select: none;
+}
+
+.figma-toggle__option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.figma-toggle__option.is-active {
+  background: rgba(0, 102, 204, 0.22);
+  color: var(--figma-text);
+}
+
+.figma-switch {
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-sm);
@@ -603,7 +640,7 @@
   user-select: none;
 }
 
-.figma-preview-toggle input[type='checkbox'] {
+.figma-switch input[type='checkbox'] {
   width: 16px;
   height: 16px;
 }
@@ -1248,6 +1285,17 @@
 .figma-frame-preview__overlay {
   position: absolute;
   inset: 0;
+}
+
+.figma-frame-preview__background {
+  position: absolute;
+  inset: 0;
+}
+
+.figma-frame-preview__piece {
+  position: absolute;
+  object-fit: contain;
+  pointer-events: none;
 }
 
 .figma-frame-preview__box {

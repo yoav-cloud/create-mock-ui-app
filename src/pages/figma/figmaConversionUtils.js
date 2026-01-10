@@ -16,6 +16,10 @@ export const extractVariableFromName = (nodeName = '') => {
   return sanitized || null
 }
 
+export const isDynamicCandidateName = (nodeName = '') => {
+  return typeof nodeName === 'string' && nodeName.includes(TEMPLATE_MARKER)
+}
+
 export const collectFramesFromDocument = (documentNode) => {
   if (!documentNode?.children) return []
   const frames = []
@@ -69,6 +73,58 @@ export const extractTemplatedNodes = (node, acc = []) => {
   return acc
 }
 
+const isNodeVisible = (node) => {
+  if (!node) return false
+  if (node.visible === false) return false
+  if (node.opacity !== undefined && Number(node.opacity) <= 0) return false
+  return true
+}
+
+const hasRenderableBounds = (node) => {
+  const bounds = node?.absoluteRenderBounds || node?.absoluteBoundingBox
+  if (!bounds) return false
+  const width = Number(bounds.width) || 0
+  const height = Number(bounds.height) || 0
+  return width > 0 && height > 0
+}
+
+export const collectRenderableNodesForFrame = (frameNode) => {
+  const acc = []
+
+  const walk = (node) => {
+    if (!node || !isNodeVisible(node)) return
+
+    // Treat any node with a template marker as an atomic layer (don’t descend),
+    // even if it’s a group/instance. This matches the “# => dynamic candidate” convention.
+    if (isDynamicCandidateName(node.name) && hasRenderableBounds(node)) {
+      acc.push(node)
+      return
+    }
+
+    if (node.type === 'TEXT' && hasRenderableBounds(node)) {
+      acc.push(node)
+      return
+    }
+
+    if (Array.isArray(node.children) && node.children.length) {
+      node.children.forEach(walk)
+      return
+    }
+
+    // Leaf non-text nodes become background image layers.
+    if (node.type !== 'TEXT' && hasRenderableBounds(node)) {
+      acc.push(node)
+    }
+  }
+
+  // Start from the frame itself (but only collect its descendants)
+  if (frameNode?.children?.length) {
+    frameNode.children.forEach(walk)
+  }
+
+  return acc
+}
+
 const toHex = (value) => {
   return Math.max(0, Math.min(255, Math.round(value))).toString(16).padStart(2, '0')
 }
@@ -116,7 +172,8 @@ export const buildLayerPreviewForFrame = ({ frameNode, templatedNodes = [] }) =>
 
   const previewLayers = {
     images: [],
-    texts: []
+    texts: [],
+    dynamicIds: []
   }
 
   const overlayLayers = []
@@ -137,6 +194,9 @@ export const buildLayerPreviewForFrame = ({ frameNode, templatedNodes = [] }) =>
     }
 
     overlayLayers.push(layerBase)
+    if (isDynamicCandidateName(node?.name || '')) {
+      previewLayers.dynamicIds.push(node.id)
+    }
 
     if (node.type === 'TEXT') {
       previewLayers.texts.push({
@@ -161,8 +221,8 @@ export const buildLayerPreviewForFrame = ({ frameNode, templatedNodes = [] }) =>
   return { previewLayers, overlayLayers, frameWidth, frameHeight }
 }
 
-const buildTextLayer = (node, frame) => {
-  const variable = extractVariableFromName(node.name)
+const buildTextLayer = (node, frame, { isDynamic } = {}) => {
+  const variable = isDynamic ? extractVariableFromName(node.name) : null
   const text = cleanText(node.characters || '')
   const fontSize = Math.round(node.style?.fontSize || node.fontSize || 32)
   const fontFamily = (node.style?.fontFamily || node.fontName?.family || 'Arial').replace(/\s+/g, '_')
@@ -246,8 +306,8 @@ const buildTextLayer = (node, frame) => {
   }
 }
 
-const buildImageLayer = (node, frame, assetsMap) => {
-  const variable = extractVariableFromName(node.name)
+const buildImageLayer = (node, frame, assetsMap, { isDynamic } = {}) => {
+  const variable = isDynamic ? extractVariableFromName(node.name) : null
   const asset = assetsMap[node.id]
   if (!asset?.publicId) {
     return {
@@ -293,7 +353,14 @@ const buildImageLayer = (node, frame, assetsMap) => {
   }
 }
 
-export const buildTransformationForFrame = ({ frameNode, textNodes = [], imageNodes = [], assetsMap = {} }) => {
+export const buildTransformationForFrame = ({
+  frameNode,
+  textNodes = [],
+  imageNodes = [],
+  assetsMap = {},
+  dynamicNodeIds = null,
+  backgroundAssetPublicId = ''
+}) => {
   const background = getBackgroundColor(frameNode)
   const baseSegments = []
   
@@ -312,8 +379,26 @@ export const buildTransformationForFrame = ({ frameNode, textNodes = [], imageNo
   const layers = []
   const overlays = []
 
+  if (backgroundAssetPublicId) {
+    const frameBox = frameNode.absoluteBoundingBox || { width: 0, height: 0 }
+    const w = Math.round(frameBox.width ?? frameNode.width ?? 0)
+    const h = Math.round(frameBox.height ?? frameNode.height ?? 0)
+    const publicId = backgroundAssetPublicId.replace(/\//g, ':')
+    const baseOverlay = [
+      `l_${publicId}`,
+      'g_north_west',
+      'x_0',
+      'y_0',
+      w ? `w_${w}` : null,
+      h ? `h_${h}` : null,
+      'c_fit'
+    ].filter(Boolean).join(',')
+    overlays.push(`${baseOverlay}/fl_layer_apply`)
+  }
+
   textNodes.forEach(node => {
-    const layer = buildTextLayer(node, frameNode)
+    const isDynamic = dynamicNodeIds ? dynamicNodeIds.has(node.id) : Boolean(extractVariableFromName(node.name))
+    const layer = buildTextLayer(node, frameNode, { isDynamic })
     layers.push(layer)
     if (layer.variableDefinition) {
       // Ensure variable definition is properly double-encoded
@@ -328,7 +413,8 @@ export const buildTransformationForFrame = ({ frameNode, textNodes = [], imageNo
   })
 
   imageNodes.forEach(node => {
-    const layer = buildImageLayer(node, frameNode, assetsMap)
+    const isDynamic = dynamicNodeIds ? dynamicNodeIds.has(node.id) : Boolean(extractVariableFromName(node.name))
+    const layer = buildImageLayer(node, frameNode, assetsMap, { isDynamic })
     layers.push(layer)
     if (layer.variableDefinition) {
       variableDefinitions.push(layer.variableDefinition)

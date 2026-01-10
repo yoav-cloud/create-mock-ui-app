@@ -75,7 +75,7 @@ export async function fetchFigmaImagesForNodes(token, fileKey, nodeIds = []) {
     const url = new URL(`https://api.figma.com/v1/images/${fileKey}`)
     url.searchParams.set('ids', chunk.join(','))
     url.searchParams.set('format', 'png')
-    url.searchParams.set('scale', '2')
+    url.searchParams.set('scale', '1')
     const response = await fetch(url, {
       headers: {
         Authorization: `Bearer ${token}`

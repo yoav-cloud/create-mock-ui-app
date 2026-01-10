@@ -18,6 +18,7 @@ import AICreateChildDesignModal from './playground/AICreateChildDesignModal'
 import { fetchImageAsBase64 } from './playground/imageBase64'
 import { createChildDesignWithAI } from './playground/aiDesignCreatorApi'
 import { computePropertyOverridesForChild } from './playground/propertyOverridesFromRules'
+import { useYogaLayout } from '../yoga/hooks/useYogaLayout'
 
 const cloneDesignRules = () => JSON.parse(JSON.stringify(DEFAULT_DESIGN_RULES))
 
@@ -418,6 +419,23 @@ function DesignPlayground() {
   const [currentImageUrl, setCurrentImageUrl] = useState('')
   // Track if this is the initial load (don't show toast on initial load)
   const isInitialLoad = useRef(true)
+
+  // Yoga Layout integration
+  const yogaLayoutHook = useYogaLayout(editableRules)
+
+  // Regenerate Yoga layouts when design rules change
+  useEffect(() => {
+    if (Object.keys(editableRules).length > 0) {
+      yogaLayoutHook.generateYogaLayouts()
+    }
+  }, [editableRules, yogaLayoutHook.generateYogaLayouts])
+
+  // Sync Yoga layout selected design with playground selected design
+  useEffect(() => {
+    if (selectedDesign?.id) {
+      yogaLayoutHook.switchDesign(selectedDesign.id)
+    }
+  }, [selectedDesign?.id, yogaLayoutHook.switchDesign])
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -1180,11 +1198,19 @@ function DesignPlayground() {
       setAvailableFonts(prev => mergeFontOptions(prev, payload.fonts))
     }
     if (payload.templateName) {
-      // Just use the template name directly as provided (it should already be formatted/cleaned if needed)
       setDesignName(payload.templateName)
     }
+    
+    // Generate Yoga Layout representation after import
+    setTimeout(() => {
+      const yogaLayouts = yogaLayoutHook.generateYogaLayouts()
+      if (yogaLayouts) {
+        console.log('✅ Yoga Layout generated and stored in memory')
+      }
+    }, 500)
+    
     toast.success(`Created design from ${payload.templateName || 'imported template'}`)
-  }, [])
+  }, [yogaLayoutHook])
 
   const handleSelectExample = useCallback(() => {
     // Reset to default design rules
@@ -1320,7 +1346,8 @@ function DesignPlayground() {
     highlightedField,
     expandedLayers,
     setExpandedLayers,
-    highlightedLayer
+    highlightedLayer,
+    yogaLayout: yogaLayoutHook
   }
 
   const reviewContext = {

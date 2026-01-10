@@ -1,0 +1,300 @@
+.yoga-preview {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #f8f9fa;
+  overflow: hidden;
+}
+
+.yoga-preview-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #666;
+  padding: 2rem;
+  text-align: center;
+}
+
+.yoga-empty-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.yoga-empty-hint {
+  font-size: 0.875rem;
+  color: #999;
+  margin-top: 0.5rem;
+}
+
+.yoga-preview-header {
+  display: flex;
+  gap: 2rem;
+  padding: 1rem 1.5rem;
+  background: white;
+  border-bottom: 1px solid #e0e0e0;
+  flex-shrink: 0;
+}
+
+.yoga-info {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.yoga-info-label {
+  font-size: 0.75rem;
+  color: #666;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.yoga-info-value {
+  font-size: 0.875rem;
+  color: #333;
+  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+}
+
+.yoga-preview-viewport {
+  flex: 1;
+  overflow: auto;
+  padding: 2rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.yoga-container {
+  position: relative;
+  border: 2px solid #333;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  flex-shrink: 0;
+}
+
+.yoga-layer {
+  position: absolute;
+  border: 2px solid;
+  background: rgba(255, 255, 255, 0.05);
+  transition: all 0.2s;
+  cursor: pointer;
+  overflow: visible;
+}
+
+.yoga-layer:hover {
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.yoga-layer.text {
+  border-color: #ff9800;
+}
+
+.yoga-layer.image {
+  border-color: #9c27b0;
+}
+
+.yoga-layer.yoga-background {
+  border-color: #2196f3;
+  background: rgba(33, 150, 243, 0.1);
+}
+
+/* Layer name - always visible in top-left corner */
+.yoga-layer-name {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.375rem;
+  border-radius: 3px;
+  font-size: 0.625rem;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.yoga-layer-icon {
+  font-size: 0.875rem;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.yoga-layer.text .yoga-layer-icon {
+  color: #ff9800;
+}
+
+.yoga-layer.image .yoga-layer-icon {
+  color: #9c27b0;
+}
+
+.yoga-layer.yoga-background .yoga-layer-icon {
+  color: #2196f3;
+}
+
+.yoga-layer-label {
+  color: #333;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Hover details - only visible on hover */
+.yoga-layer-hover-details {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 0.25rem;
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  font-size: 0.625rem;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s, visibility 0.2s;
+  z-index: 101;
+  min-width: 150px;
+  pointer-events: none;
+}
+
+.yoga-layer:hover .yoga-layer-hover-details {
+  opacity: 1;
+  visibility: visible;
+}
+
+.yoga-layer-dimensions,
+.yoga-layer-position {
+  font-size: 0.625rem;
+  color: #333;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.yoga-layer-position {
+  color: #666;
+  font-weight: normal;
+}
+
+.yoga-layer-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #eee;
+  color: #666;
+}
+
+.yoga-detail-line {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.yoga-detail-line.text-preview {
+  font-style: italic;
+  color: #999;
+}
+
+.yoga-badge {
+  display: inline-block;
+  padding: 0.125rem 0.375rem;
+  background: #4caf50;
+  color: white;
+  border-radius: 3px;
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.yoga-layer-dimensions,
+.yoga-layer-position {
+  position: absolute;
+  font-size: 0.625rem;
+  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+  background: rgba(0, 0, 0, 0.75);
+  color: white;
+  padding: 0.125rem 0.25rem;
+  border-radius: 2px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.yoga-layer:hover .yoga-layer-dimensions,
+.yoga-layer:hover .yoga-layer-position {
+  opacity: 1;
+}
+
+.yoga-layer-dimensions {
+  bottom: -1.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.yoga-layer-position {
+  top: -1.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.yoga-legend {
+  display: flex;
+  gap: 1.5rem;
+  padding: 1rem 1.5rem;
+  background: white;
+  border-top: 1px solid #e0e0e0;
+  flex-shrink: 0;
+}
+
+.yoga-legend-item {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  font-size: 0.75rem;
+  color: #666;
+}
+
+.yoga-legend-swatch {
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 2px solid;
+  border-radius: 3px;
+}
+
+.yoga-legend-swatch.text {
+  border-color: #ff9800;
+  background: rgba(255, 152, 0, 0.2);
+}
+
+.yoga-legend-swatch.image {
+  border-color: #9c27b0;
+  background: rgba(156, 39, 176, 0.2);
+}
+
+.yoga-legend-swatch.background {
+  border-color: #2196f3;
+  background: rgba(33, 150, 243, 0.2);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .yoga-preview-header {
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  .yoga-legend {
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+}

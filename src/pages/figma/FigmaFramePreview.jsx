@@ -19,7 +19,10 @@ export default function FigmaFramePreview({
   frameName = '',
   imageUrl = '',
   isLoading = false,
+  renderMode = 'dynamic',
   showOverlays = false,
+  backgroundPieces = [],
+  backgroundColor = 'transparent',
   frameWidth = 0,
   frameHeight = 0,
   layers = [],
@@ -27,7 +30,10 @@ export default function FigmaFramePreview({
   mainProductLayerId = '',
   onToggleLayer = null
 }) {
-  const hasCanvas = Boolean(imageUrl && frameWidth > 0 && frameHeight > 0)
+  const hasCanvas = Boolean(frameWidth > 0 && frameHeight > 0 && (
+    (renderMode === 'dynamic' && imageUrl) ||
+    (renderMode === 'background' && Array.isArray(backgroundPieces))
+  ))
   const layerCount = layers.length
 
   const normalizedLayers = useMemo(() => {
@@ -101,13 +107,40 @@ export default function FigmaFramePreview({
           className="figma-frame-preview__canvas"
           style={{ aspectRatio: `${frameWidth} / ${frameHeight}` }}
         >
-          <img
-            className="figma-frame-preview__image"
-            src={imageUrl}
-            alt={frameName ? `Preview of ${frameName}` : 'Frame preview'}
-            loading="lazy"
-          />
-          {showOverlays && (
+          {renderMode === 'dynamic' && (
+            <img
+              className="figma-frame-preview__image"
+              src={imageUrl}
+              alt={frameName ? `Preview of ${frameName}` : 'Frame preview'}
+              loading="lazy"
+            />
+          )}
+
+          {renderMode === 'background' && (
+            <div
+              className="figma-frame-preview__background"
+              style={{ background: backgroundColor }}
+              aria-label="Background preview"
+            >
+              {(backgroundPieces || []).map(piece => (
+                <img
+                  key={piece.id}
+                  className="figma-frame-preview__piece"
+                  src={piece.imageUrl}
+                  alt=""
+                  style={{
+                    left: percent((piece.box?.x || 0) / frameWidth),
+                    top: percent((piece.box?.y || 0) / frameHeight),
+                    width: percent((piece.box?.width || 0) / frameWidth),
+                    height: percent((piece.box?.height || 0) / frameHeight)
+                  }}
+                  loading="lazy"
+                />
+              ))}
+            </div>
+          )}
+
+          {renderMode === 'dynamic' && showOverlays && (
             <div className="figma-frame-preview__overlay" aria-hidden="true">
               {normalizedLayers.map(layer => {
                 const styles = {
