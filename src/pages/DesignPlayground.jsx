@@ -432,10 +432,17 @@ function DesignPlayground() {
 
   // Sync Yoga layout selected design with playground selected design
   useEffect(() => {
-    if (selectedDesign?.id) {
+    if (selectedDesign?.id && yogaLayoutHook.yogaLayouts) {
+      console.log(`[DesignPlayground] Switching Yoga design to: ${selectedDesign.id}`)
       yogaLayoutHook.switchDesign(selectedDesign.id)
+    } else {
+      console.log(`[DesignPlayground] Cannot switch Yoga design:`, { 
+        designId: selectedDesign?.id, 
+        hasLayouts: !!yogaLayoutHook.yogaLayouts 
+      })
     }
-  }, [selectedDesign?.id, yogaLayoutHook.switchDesign])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDesign?.id, yogaLayoutHook.yogaLayouts])
 
   useEffect(() => {
     const timer = setTimeout(() => {

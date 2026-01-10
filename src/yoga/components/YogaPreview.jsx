@@ -50,7 +50,7 @@ const YogaPreview = ({ yogaLayout, designId }) => {
     height: containerHeight,
     backgroundColor: container.backgroundColor || '#ffffff',
     transform: `scale(${containerScale})`,
-    transformOrigin: 'top left'
+    transformOrigin: 'center center'
   }
 
   return (

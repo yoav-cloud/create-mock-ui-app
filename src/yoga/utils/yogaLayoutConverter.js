@@ -44,6 +44,30 @@ const convertGravityToAbsolutePosition = (x, y, gravity, layerWidth, layerHeight
 }
 
 /**
+ * Resolves font size from a string (which may be a percentage) or number
+ * @param {string|number} fontSizeValue - The font size value (e.g., "110%", 32, "32")
+ * @param {number} parentFontSize - The parent design's font size for this layer type
+ * @returns {number} The resolved font size in pixels
+ */
+const resolveFontSize = (fontSizeValue, parentFontSize = 32) => {
+  if (typeof fontSizeValue === 'number') {
+    return fontSizeValue
+  }
+  
+  if (typeof fontSizeValue === 'string') {
+    // Handle percentage values like "110%"
+    if (fontSizeValue.includes('%')) {
+      const percentage = parseFloat(fontSizeValue) / 100
+      return Math.round(parentFontSize * percentage)
+    }
+    // Handle numeric strings like "32"
+    return parseFloat(fontSizeValue) || 16
+  }
+  
+  return 16 // Default fallback
+}
+
+/**
  * Estimates the rendered width of text based on content and font size
  * This is a rough approximation - actual width depends on font family and styling
  */
@@ -65,7 +89,16 @@ export const convertLayerToYogaNode = (layerKey, layerData, parentDimensions) =>
   
   // For text layers without explicit dimensions, estimate them based on actual content
   if (isTextLayer(layerData)) {
-    const fontSize = layerData.fontSize || 16
+    // Resolve font size - handle percentage values like "110%"
+    // Use sensible defaults for parent fontSize based on common layer types
+    const parentFontSizeDefaults = {
+      title: 32,
+      tagline: 20,
+      price: 44,
+      origPrice: 30
+    }
+    const parentFontSize = parentFontSizeDefaults[layerKey] || 16
+    const fontSize = resolveFontSize(layerData.fontSize, parentFontSize)
     const isBold = layerData.bold || false
     
     if (!layerWidth) {
@@ -117,9 +150,19 @@ export const convertLayerToYogaNode = (layerKey, layerData, parentDimensions) =>
   }
 
   if (isTextLayer(layerData)) {
+    // Resolve font size for text properties
+    const parentFontSizeDefaults = {
+      title: 32,
+      tagline: 20,
+      price: 44,
+      origPrice: 30
+    }
+    const parentFontSize = parentFontSizeDefaults[layerKey] || 16
+    const resolvedFontSize = resolveFontSize(layerData.fontSize, parentFontSize)
+    
     yogaNode.text = {
       content: layerData.defaultValue || '',
-      fontSize: layerData.fontSize || 16,
+      fontSize: resolvedFontSize,
       fontFamily: layerData.font || 'Arial',
       color: layerData.color || '#000000',
       fieldName: layerData.fieldName || layerKey
