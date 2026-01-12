@@ -83,7 +83,7 @@
 }
 
 .yoga-layer:hover {
-  z-index: 100;
+  z-index: 1000 !important;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
   background: rgba(255, 255, 255, 0.9);
 }
@@ -99,6 +99,10 @@
 .yoga-layer.yoga-background {
   border-color: #2196f3;
   background: rgba(33, 150, 243, 0.1);
+}
+
+.yoga-layer.yoga-background:hover {
+  background: rgba(33, 150, 243, 0.2);
 }
 
 /* Layer name - always visible in top-left corner */

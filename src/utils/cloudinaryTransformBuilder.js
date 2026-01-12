@@ -167,7 +167,7 @@ export function buildCloudinaryTransform({
       return `${fallback}_${fontSize}${formatStr}`
     }
     const encoded = trimmed.replace(/\s+/g, '%20')
-    return `${encoded}@google_${fontSize}${formatStr}`
+    return `${encoded}@google_${fontSize}`
   }
 
   layerEntries.forEach(([layerKey, layerData]) => {

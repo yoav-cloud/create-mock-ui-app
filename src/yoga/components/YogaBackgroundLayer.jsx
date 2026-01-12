@@ -6,7 +6,8 @@ const YogaBackgroundLayer = ({ backgroundImage }) => {
     left: backgroundImage.x || 0,
     top: backgroundImage.y || 0,
     width: backgroundImage.width,
-    height: backgroundImage.height
+    height: backgroundImage.height,
+    zIndex: 0
   }
 
   return (

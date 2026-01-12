@@ -44,7 +44,8 @@ const YogaLayerBox = ({ layer, index }) => {
     left: layer.layout.left,
     top: layer.layout.top,
     width: layer.layout.width || 'auto',
-    height: layer.layout.height || 'auto'
+    height: layer.layout.height || 'auto',
+    zIndex: index + 1
   }
 
   return (

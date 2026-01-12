@@ -517,7 +517,7 @@ function DesignPlayground() {
       savedValues,
       selectedAsset,
       selectedDesign: designObj,
-      baseWidth: BASE_WIDTH,
+      baseWidth: resolvedDimensions.width,
       getDefaultValue: resolveDefaultValue,
       shouldUseMetadata,
       getMetaKeyForField: resolveMetaKey,
