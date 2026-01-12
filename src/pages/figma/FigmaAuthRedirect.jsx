@@ -110,12 +110,16 @@ export default function FigmaAuthRedirect() {
         }
 
         setStatus('Access granted! You can close this window.')
+        
+        await new Promise(resolve => setTimeout(resolve, 300))
+        
         if (window.opener && !window.opener.closed) {
           window.opener.focus()
         }
+        
         setTimeout(() => {
           window.close()
-        }, 1200)
+        }, 1500)
       } catch (err) {
         const message = err.message || 'Unexpected error while finishing Figma OAuth.'
         localStorage.setItem(STORAGE_KEYS.error, message)

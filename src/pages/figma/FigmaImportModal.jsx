@@ -415,6 +415,48 @@ useEffect(() => {
     authWindowRef.current.focus()
     setStep(STEP.TOKEN)
     setIsLoading(true)
+
+    const pollInterval = setInterval(() => {
+      if (authWindowRef.current && authWindowRef.current.closed) {
+        clearInterval(pollInterval)
+        
+        const token = localStorage.getItem(STORAGE_KEYS.accessToken)
+        const error = localStorage.getItem(STORAGE_KEYS.error)
+        
+        if (token) {
+          setAccessToken(token)
+          setError('')
+          setStep(STEP.TOKEN)
+          hydrateProfile(token).catch(err => {
+            setError(err.message || 'Failed to load data from Figma.')
+            setIsLoading(false)
+          })
+        } else if (error) {
+          setError(error)
+          localStorage.removeItem(STORAGE_KEYS.error)
+          setIsLoading(false)
+          setStep(STEP.CONNECT)
+        } else {
+          setError('Authentication window closed without completing the flow.')
+          setIsLoading(false)
+          setStep(STEP.CONNECT)
+        }
+        
+        authWindowRef.current = null
+      }
+    }, 500)
+
+    setTimeout(() => {
+      clearInterval(pollInterval)
+      if (authWindowRef.current && !authWindowRef.current.closed) {
+        authWindowRef.current.close()
+      }
+      if (isLoading && step === STEP.TOKEN && !accessToken) {
+        setError('Authentication timed out. Please try again.')
+        setIsLoading(false)
+        setStep(STEP.CONNECT)
+      }
+    }, 60000)
   }
 
 
