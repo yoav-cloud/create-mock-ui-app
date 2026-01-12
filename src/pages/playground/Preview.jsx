@@ -18,6 +18,7 @@ export default function Preview({
   showLayerOverlays,
   onToggleLayerOverlays,
   editableRules,
+  setEditableRules,
   selectedDesignId,
   formValues,
   useMetadata,
@@ -37,7 +38,11 @@ export default function Preview({
   getFontOptions,
   handleFontSizeValidation,
   hoveredLayerFromPanel,
-  yogaLayout
+  yogaLayout,
+  designTypes,
+  setDesignTypes,
+  selectedAsset,
+  buildDesignPreviewUrl
 }) {
   return (
     <div className="preview-area">
@@ -145,6 +150,12 @@ export default function Preview({
           <YogaPreview 
             yogaLayout={yogaLayout?.currentDesignYogaLayout}
             designId={selectedDesign?.id || 'unknown'}
+            editableRules={editableRules}
+            setEditableRules={setEditableRules}
+            designTypes={designTypes}
+            setDesignTypes={setDesignTypes}
+            selectedAsset={selectedAsset}
+            buildDesignPreviewUrl={buildDesignPreviewUrl}
           />
         </div>
       )}

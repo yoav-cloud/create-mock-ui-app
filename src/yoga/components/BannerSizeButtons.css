@@ -1,0 +1,127 @@
+.banner-size-controls {
+  padding: 1rem 1.5rem;
+  background: white;
+  border-top: 1px solid #e0e0e0;
+  flex-shrink: 0;
+}
+
+.banner-size-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.banner-size-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.banner-size-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.save-design-btn {
+  padding: 0.25rem 0.75rem;
+  border: 1px solid #4caf50;
+  background: #4caf50;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.save-design-btn:hover {
+  background: #45a049;
+  border-color: #45a049;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(76, 175, 80, 0.3);
+}
+
+.reset-size-btn {
+  padding: 0.25rem 0.75rem;
+  border: 1px solid #ddd;
+  background: white;
+  color: #666;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.reset-size-btn:hover {
+  background: #f5f5f5;
+  border-color: #999;
+  color: #333;
+}
+
+.banner-size-buttons {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.banner-size-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.75rem 1rem;
+  border: 2px solid #e0e0e0;
+  background: white;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 120px;
+}
+
+.banner-size-btn:hover {
+  border-color: #4caf50;
+  background: #f9fdf9;
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(76, 175, 80, 0.2);
+}
+
+.banner-size-btn.active {
+  border-color: #4caf50;
+  background: #4caf50;
+  color: white;
+}
+
+.banner-size-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.banner-size-btn.active .banner-size-name {
+  color: white;
+}
+
+.banner-size-dims {
+  font-size: 0.7rem;
+  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+  color: #999;
+}
+
+.banner-size-btn.active .banner-size-dims {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+@media (max-width: 768px) {
+  .banner-size-buttons {
+    gap: 0.5rem;
+  }
+  
+  .banner-size-btn {
+    min-width: 100px;
+    padding: 0.5rem 0.75rem;
+  }
+}

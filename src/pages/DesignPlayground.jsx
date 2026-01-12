@@ -1306,6 +1306,7 @@ function DesignPlayground() {
     selectedAsset,
     setSelectedAsset,
     designTypes,
+    setDesignTypes,
     selectedDesign,
     setSelectedDesign,
     openAICreateChildDesignModal: () => setIsAICreateChildModalOpen(true),
@@ -1325,6 +1326,7 @@ function DesignPlayground() {
     showLayerOverlays,
     setShowLayerOverlays,
     editableRules,
+    setEditableRules,
     formValues,
     useMetadata,
     urlSegments,
@@ -1354,7 +1356,8 @@ function DesignPlayground() {
     expandedLayers,
     setExpandedLayers,
     highlightedLayer,
-    yogaLayout: yogaLayoutHook
+    yogaLayout: yogaLayoutHook,
+    buildDesignPreviewUrl
   }
 
   const reviewContext = {

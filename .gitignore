@@ -29,3 +29,5 @@ figma-example
 
 # Local scripts / scratch space (keep out of git)
 test/
+
+.pnpm-store/

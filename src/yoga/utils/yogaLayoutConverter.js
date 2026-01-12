@@ -133,6 +133,7 @@ export const convertLayerToYogaNode = (layerKey, layerData, parentDimensions) =>
     key: layerKey,
     type: isTextLayer(layerData) ? 'text' : 'image',
     displayName: layerData.displayName || layerKey,
+    priority: layerData.priority,
     layout: {
       position: 'absolute',
       width: layerWidth,

@@ -14,6 +14,7 @@ export default function PlaygroundDesignView() {
 
   const {
     designTypes,
+    setDesignTypes,
     selectedDesign,
     setSelectedDesign,
     openAICreateChildDesignModal,
@@ -33,6 +34,7 @@ export default function PlaygroundDesignView() {
     showLayerOverlays,
     setShowLayerOverlays,
     editableRules,
+    setEditableRules,
     formValues,
     useMetadata,
     urlSegments,
@@ -62,7 +64,9 @@ export default function PlaygroundDesignView() {
     expandedLayers,
     setExpandedLayers,
     highlightedLayer,
-    yogaLayout
+    yogaLayout,
+    selectedAsset,
+    buildDesignPreviewUrl
   } = design
 
   return (
@@ -93,6 +97,7 @@ export default function PlaygroundDesignView() {
         showLayerOverlays={showLayerOverlays}
         onToggleLayerOverlays={setShowLayerOverlays}
         editableRules={editableRules}
+        setEditableRules={setEditableRules}
         selectedDesignId={selectedDesign.id}
         formValues={formValues}
         useMetadata={useMetadata}
@@ -112,6 +117,10 @@ export default function PlaygroundDesignView() {
         getFontOptions={getFontOptions}
         handleFontSizeValidation={handleFontSizeValidation}
         hoveredLayerFromPanel={hoveredLayerFromPanel}
+        designTypes={designTypes}
+        setDesignTypes={setDesignTypes}
+        selectedAsset={selectedAsset}
+        buildDesignPreviewUrl={buildDesignPreviewUrl}
       />
 
       <Controls
