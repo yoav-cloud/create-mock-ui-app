@@ -73,6 +73,12 @@
   flex-shrink: 0;
 }
 
+/* 
+ * Layer z-index system:
+ * - Background: 0 (set in YogaBackgroundLayer)
+ * - Regular layers: index + 1 (set in YogaLayerBox, maintains render order)
+ * - Hovered non-background layer: 100 (temporary boost to show above siblings)
+ */
 .yoga-layer {
   position: absolute;
   border: 2px solid;
@@ -83,9 +89,13 @@
 }
 
 .yoga-layer:hover {
-  z-index: 1000 !important;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
   background: rgba(255, 255, 255, 0.9);
+}
+
+/* Only boost z-index for non-background layers on hover to show above siblings */
+.yoga-layer:not(.yoga-background):hover {
+  z-index: 100;
 }
 
 .yoga-layer.text {

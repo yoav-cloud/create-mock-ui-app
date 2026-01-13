@@ -127,27 +127,33 @@ function DesignPlayground() {
           ...Object.keys(parsed || {})
         ])
         designIds.forEach(designId => {
-          const designRule = defaultRulesRef.current[designId] || parsed[designId] || {}
+          const designRule = defaultRulesRef.current[designId] || {}
           const savedRule = parsed[designId] || {}
 
           // Deep merge layer properties dynamically
-          const layers = extractLayers(designRule)
+          // Extract layers from BOTH default and saved rules to ensure Figma imports are preserved
+          const defaultLayers = extractLayers(designRule)
+          const savedLayers = extractLayers(savedRule)
+          const allLayerKeys = new Set([
+            ...Object.keys(defaultLayers),
+            ...Object.keys(savedLayers)
+          ])
+          
           const mergedLayers = {}
-          Object.keys(layers).forEach(layerKey => {
-            if (designRule[layerKey] || savedRule[layerKey]) {
-              mergedLayers[layerKey] = {
-                ...(designRule[layerKey] || {}),
-                ...(savedRule[layerKey] || {})
-              }
-              // Ensure textWidth defaults to 80% of canvas width for text layers with textWrap
-              const layerData = mergedLayers[layerKey]
-              if (isTextLayer(layerData) && layerData.textWrap !== false && !layerData.textWidth) {
-                layerData.textWidth = Math.round((designRule.width || 500) * 0.8)
-              }
-              // Ensure textWrap defaults to true for text layers
-              if (isTextLayer(layerData) && layerData.textWrap === undefined) {
-                layerData.textWrap = true
-              }
+          allLayerKeys.forEach(layerKey => {
+            mergedLayers[layerKey] = {
+              ...(designRule[layerKey] || {}),
+              ...(savedRule[layerKey] || {})
+            }
+            // Ensure textWidth defaults to 80% of canvas width for text layers with textWrap
+            const layerData = mergedLayers[layerKey]
+            const canvasWidth = savedRule.width || designRule.width || 500
+            if (isTextLayer(layerData) && layerData.textWrap !== false && !layerData.textWidth) {
+              layerData.textWidth = Math.round(canvasWidth * 0.8)
+            }
+            // Ensure textWrap defaults to true for text layers
+            if (isTextLayer(layerData) && layerData.textWrap === undefined) {
+              layerData.textWrap = true
             }
           })
 
@@ -428,7 +434,8 @@ function DesignPlayground() {
     if (Object.keys(editableRules).length > 0) {
       yogaLayoutHook.generateYogaLayouts()
     }
-  }, [editableRules, yogaLayoutHook.generateYogaLayouts])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editableRules])
 
   // Sync Yoga layout selected design with playground selected design
   useEffect(() => {
@@ -1208,16 +1215,8 @@ function DesignPlayground() {
       setDesignName(payload.templateName)
     }
     
-    // Generate Yoga Layout representation after import
-    setTimeout(() => {
-      const yogaLayouts = yogaLayoutHook.generateYogaLayouts()
-      if (yogaLayouts) {
-        console.log('✅ Yoga Layout generated and stored in memory')
-      }
-    }, 500)
-    
     toast.success(`Created design from ${payload.templateName || 'imported template'}`)
-  }, [yogaLayoutHook])
+  }, [designTypes])
 
   const handleSelectExample = useCallback(() => {
     // Reset to default design rules
